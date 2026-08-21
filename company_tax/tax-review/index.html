@@ -1,0 +1,2844 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 세무사</title>
+<style>
+  :root {
+    --bg: #faf9f5;
+    --ink: #0b0d0f;
+    --ink-2: #252523;
+    --ink-3: #3d3d3a;
+    --muted: #6c6a64;
+    --muted-2: #7c8089;
+    --line: #e6dfd8;
+    --line-2: #ebe6df;
+    --track: #e8e0d2;
+    --chip: #efe9de;
+    --done: #f5f0e8;
+    --accent: #0068ff;
+    --accent-dark: #0052cc;
+    --accent-soft: #e7f2ff;
+    --font: 'Noto Sans KR', 'Malgun Gothic', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  /* 세로 스크롤바 자리를 항상 비워 둔다. 화면을 넘길 때 스크롤바가 생기고 사라지면
+     가운데 정렬된 헤더·본문이 좌우로 밀린다 (로고와 제목이 흔들리는 원인). */
+  html { scrollbar-gutter: stable; }
+  html, body { margin: 0; padding: 0; background: var(--bg); }
+  body {
+    min-height: 100vh; font-family: var(--font); color: var(--ink);
+    display: flex; flex-direction: column; align-items: center;
+  }
+  input, select, button { font-family: var(--font); }
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  @keyframes slidein { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes popin { from { opacity: 0; transform: translateY(6px) scale(.98); } to { opacity: 1; transform: none; } }
+
+  /* ── 헤더 ── */
+  .hdr { width: 100%; position: sticky; top: 0; z-index: 20; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .hdr-in { max-width: 720px; margin: 0 auto; padding: 12px 24px 8px; display: flex; flex-direction: column; gap: 8px; }
+  /* 헤더 높이는 화면이 바뀌어도 같아야 한다. 나타났다 사라지는 요소(이동 버튼·진행바·빵가루)가
+     사라질 때 자리를 비우면 본문이 위아래로 튄다. 그래서 감추더라도 자리는 남긴다. */
+  .hdr-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; row-gap: 8px; min-height: 32px; }
+  /* 로고 다음에 제목.
+     원본(535×93)은 글자 좌우에 투명 여백이 121px씩 있어, 그대로 쓰면 보이지 않는 24px이
+     제목 쪽에 붙는다. 파일은 인증받은 원본이므로 건드리지 않고 표시 상자를 좁혀 잘라낸다.
+     상자 21×70 + cover → 글자(원본 x121~414, y5~88)가 좌우 2.4px 여유로 꽉 들어온다. */
+  .hdr-logo { height: 21px; width: 70px; object-fit: cover; flex: none; }
+  .hdr-title { font-size: 18px; font-weight: 700; letter-spacing: -.3px; }
+  .hdr-logo + .hdr-title { margin-left: -8px; }
+  @media (max-width: 620px) {
+    .hdr-logo { height: 19px; width: 63px; }
+  }
+  .hdr-step { font-size: 11px; letter-spacing: 1.5px; color: var(--muted); font-weight: 500; }
+  .bar { display: block; height: 3px; background: var(--track); border-radius: 9999px; overflow: hidden; flex: 1 1 auto; }
+  .bar > i { display: block; height: 100%; background: var(--accent); border-radius: 9999px; transition: width .45s cubic-bezier(.2,.8,.2,1); }
+  /* 알약 높이(3+18+3=24)와 빈 줄 높이를 정확히 맞춘다. 1px만 어긋나도 화면을 넘길 때 본문이 튄다.
+     줄바꿈은 막는다 — 좁은 화면에서 두 줄로 감기면 그 화면만 헤더가 30px 높아진다.
+     넘치는 알약은 띠 안에서 가로로 밀린다 (상태 표시이므로 전량 노출이 필수는 아니다). */
+  .crumbs {
+    display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; overflow-x: auto;
+    font-size: 12px; min-height: 24px; scrollbar-width: none; flex: 0 1 auto; max-width: 62%;
+  }
+  .crumbs::-webkit-scrollbar { display: none; }
+  .crumb {
+    padding: 3px 10px; line-height: 18px; border-radius: 9999px; background: var(--chip);
+    color: var(--ink-2); font-weight: 500; white-space: nowrap; flex: none;
+  }
+
+  /* ── 본문 ── */
+  main { width: 100%; max-width: 720px; padding: 12px 24px 140px; flex: 1; }
+  .pane { animation: slidein .35s ease both; }
+  .eyebrow { font-size: 12px; letter-spacing: 1.5px; color: var(--accent); font-weight: 500; margin-bottom: 14px; }
+  h1 { font-size: 31px; font-weight: 700; letter-spacing: -.5px; line-height: 1.25; margin: 0 0 10px; }
+  .sec-label { font-size: 11px; letter-spacing: 1.5px; color: var(--muted); font-weight: 500; margin: 14px 0 2px; }
+  .fields { display: flex; flex-direction: column; gap: 22px; }
+  .field { display: flex; flex-direction: column; gap: 8px; }
+  label { font-size: 14px; font-weight: 500; color: var(--ink-2); }
+  .hint { font-size: 12px; line-height: 1.5; color: var(--muted-2); }
+  .hint a { color: var(--accent); text-decoration: none; font-weight: 500; }
+  .hint a:hover { color: var(--accent-dark); text-decoration: underline; }
+  .txt {
+    height: 56px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--line);
+    background: #fff; font-size: 17px; color: var(--ink); width: 100%;
+  }
+  .txt.mono { font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+  .num-wrap { position: relative; display: flex; align-items: center; }
+  .num {
+    width: 100%; height: 56px; padding: 0 62px 0 16px; border-radius: 12px; border: 1px solid var(--line);
+    background: #fff; font-size: 19px; font-weight: 500; color: var(--ink);
+    font-variant-numeric: tabular-nums; text-align: right;
+  }
+  .unit { position: absolute; right: 18px; font-size: 14px; color: var(--muted); pointer-events: none; }
+  .err { font-size: 12px; line-height: 1.5; color: #c0392b; }
+  .err:empty { display: none; }
+  .num.invalid { border-color: #c0392b; }
+  .opts { display: flex; gap: 8px; flex-wrap: wrap; }
+  .opt {
+    flex: 1; min-width: 104px; height: 52px; border-radius: 12px; border: 1px solid var(--line);
+    background: #fff; color: var(--ink-3); font-size: 15px; font-weight: 500; cursor: pointer; transition: .15s;
+  }
+  .opt.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-dark); }
+  .opt:disabled { opacity: .4; cursor: not-allowed; background: var(--done); }
+  .num[readonly] { background: var(--done); color: var(--ink-3); cursor: default; }
+  .derived { position: absolute; right: 18px; font-size: 14px; color: var(--accent-dark); font-weight: 500; pointer-events: none; }
+  .duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .duo .opt { height: 56px; font-size: 16px; }
+
+  .mode-card {
+    text-align: left; padding: 26px; border-radius: 16px; border: 1px solid var(--line); background: #fff;
+    cursor: pointer; display: flex; flex-direction: column; gap: 8px; transition: .15s; width: 100%;
+  }
+  .mode-card.on { border-color: var(--accent); background: var(--accent-soft); }
+  .mode-head { display: flex; align-items: center; gap: 10px; }
+  .mode-name { font-size: 19px; font-weight: 600; color: var(--ink); }
+  .tag { font-size: 11px; padding: 3px 9px; border-radius: 9999px; background: var(--chip); color: var(--ink-2); font-weight: 500; }
+  .tag.blue { background: var(--accent-soft); color: var(--accent-dark); }
+  .mode-desc { font-size: 14px; line-height: 1.6; color: var(--ink-3); }
+
+  .item-card {
+    text-align: left; padding: 18px 20px; border-radius: 14px; border: 1px solid var(--line); background: #fff;
+    cursor: pointer; display: flex; align-items: center; gap: 16px; transition: .15s; width: 100%;
+  }
+  .item-card.done { background: var(--done); }
+  .item-num { font-size: 12px; color: var(--accent); font-weight: 500; width: 18px; flex: none; }
+  .item-card.done .item-num { color: var(--muted-2); }
+  .item-body { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+  .item-name { font-size: 16px; font-weight: 600; color: var(--ink); }
+  .item-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .item-tag { font-size: 12px; font-weight: 500; color: #14717b; flex: none; }
+  .stack { display: flex; flex-direction: column; gap: 10px; }
+  .stack.tight { gap: 9px; }
+
+  .mode-line { display: flex; align-items: center; gap: 12px; margin: 0 0 34px; flex-wrap: wrap; }
+  .mode-line span { font-size: 14px; color: var(--ink-3); }
+  .link { border: none; background: none; color: var(--accent); font-size: 13px; font-weight: 500; cursor: pointer; padding: 0; }
+
+  /* ── 결과 ── */
+  .res { background: var(--accent); border-radius: 16px; padding: 36px 32px; color: #fff; animation: popin .4s cubic-bezier(.2,.8,.2,1) both; }
+  .res-head { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+  .res-chip { font-size: 11px; letter-spacing: 1.2px; padding: 4px 10px; border-radius: 9999px; background: rgba(255,255,255,.18); font-weight: 500; }
+  .res-mode { font-size: 12px; color: rgba(255,255,255,.75); }
+  .res-label { font-size: 14px; color: rgba(255,255,255,.85); margin-bottom: 8px; }
+  .res-total { font-size: 52px; font-weight: 700; letter-spacing: -1px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+  .res-sub { font-size: 13px; color: rgba(255,255,255,.8); margin-top: 12px; font-variant-numeric: tabular-nums; }
+
+  .block { margin-top: 28px; }
+  .block-label { font-size: 11px; letter-spacing: 1.5px; color: var(--muted); font-weight: 500; margin-bottom: 14px; }
+  .steps { background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .step-row { padding: 15px 20px; border-top: 1px solid var(--line-2); display: flex; flex-direction: column; gap: 4px; }
+  .step-row:first-child { border-top: none; }
+  .step-main { display: flex; align-items: baseline; gap: 14px; }
+  .step-name { font-size: 14px; color: var(--ink-3); flex: 1; }
+  .step-val { font-size: 15px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; text-align: right; }
+  .step-note { font-size: 12px; line-height: 1.5; color: var(--muted-2); }
+
+  /* 비교표 — 넓은 표는 페이지가 아니라 표 자신이 가로로 스크롤한다 */
+  .tbl-wrap { background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow-x: auto; }
+  table.tbl { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .tbl th, .tbl td { padding: 11px 14px; text-align: right; font-size: 13px; white-space: nowrap; border-top: 1px solid var(--line-2); }
+  .tbl th { font-size: 11px; letter-spacing: .5px; color: var(--muted); font-weight: 500; border-top: none; }
+  .tbl th:first-child, .tbl td:first-child { text-align: left; color: var(--ink-3); }
+  .tbl tbody tr.on td { background: #eef4ff; font-weight: 600; color: var(--ink); }
+  .tbl tbody tr.sum td { font-weight: 600; color: var(--ink); }
+  .tbl-note { font-size: 12px; line-height: 1.6; color: var(--muted-2); margin-top: 8px; }
+
+  .notice { margin-top: 14px; display: flex; gap: 9px; align-items: flex-start; padding: 14px 16px; background: var(--done); border-radius: 12px; }
+  .notice-mark {
+    width: 16px; height: 16px; flex: none; border: 1.5px solid #1d5fa8; color: #1d5fa8;
+    display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;
+    margin-top: 1px; clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  }
+  .notice-text { font-size: 12.5px; line-height: 1.6; color: var(--ink-2); }
+  .warn { margin-top: 12px; padding: 14px 16px; background: #fdf4e7; border: 1px solid #e8d5b0; border-radius: 12px; }
+  .warn-title { font-size: 12px; font-weight: 600; color: #8a5a12; margin-bottom: 6px; letter-spacing: .2px; }
+  .warn-list { margin: 0; padding-left: 18px; }
+  .warn-list li { font-size: 12.5px; line-height: 1.65; color: #6b4a13; }
+  .warn-body { font-size: 12.5px; line-height: 1.65; color: #6b4a13; }
+
+  .edit-toggle {
+    width: 100%; padding: 16px 20px; border-radius: 14px; border: 1px solid var(--line); background: #fff;
+    cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 15px; font-weight: 500; color: var(--ink);
+  }
+  .edit-panel {
+    margin-top: 14px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 24px;
+    display: flex; flex-direction: column; gap: 18px; animation: slidein .25s ease both;
+  }
+  .edit-panel .field { gap: 7px; }
+  .edit-panel label { font-size: 13px; }
+  .edit-panel .num { height: 48px; padding: 0 58px 0 14px; border-radius: 8px; background: var(--bg); font-size: 16px; }
+  .edit-panel .unit { right: 16px; font-size: 13px; }
+  .edit-panel .opts { gap: 7px; }
+  .edit-panel .opt { min-width: 92px; height: 44px; border-radius: 8px; font-size: 14px; }
+  .next-item {
+    text-align: left; padding: 16px 18px; border-radius: 12px; border: 1px solid var(--line); background: #fff;
+    cursor: pointer; display: flex; align-items: center; gap: 14px; width: 100%;
+  }
+  .next-item .item-name { font-size: 15px; }
+  .next-item .item-desc { font-size: 12.5px; }
+  .arrow { color: var(--accent); font-size: 15px; flex: none; }
+  .all-done { padding: 22px; background: #14161a; border-radius: 14px; color: var(--bg); }
+  .all-done-t { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .all-done-d { font-size: 13px; line-height: 1.6; color: #a09d96; }
+
+  /* ── 하단 CTA ── */
+  .cta-bar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 20; padding: 24px;
+    display: flex; justify-content: center;
+    background: linear-gradient(180deg, rgba(250,249,245,0) 0%, var(--bg) 34%);
+  }
+  .cta-in { width: 100%; max-width: 672px; display: flex; gap: 10px; }
+  .cta {
+    flex: 1; height: 56px; border-radius: 12px; border: none; background: var(--accent); color: #fff;
+    font-size: 16px; font-weight: 600; cursor: pointer; transition: .15s;
+  }
+  .cta:disabled { background: #dfe4ea; color: var(--muted); cursor: not-allowed; }
+  /* 「이전」은 「다음」과 색까지 같다. 너비만 좁게 두어 진행 방향이 오른쪽임을 남긴다.
+     돌아갈 곳이 없으면 아예 만들지 않는다. */
+  .cta-prev { flex: 0 0 auto; min-width: 132px; }
+  main.no-cta { padding-bottom: 56px; }
+  /* 시작 화면은 위아래 여백을 줄여 한 화면에 들어오게 한다. */
+  main.start { padding-top: 16px; padding-bottom: 24px; }
+
+  /* ── 상단 이동 버튼 ──
+     STEP 표시를 가리지 않도록, 진행바와 같은 줄로 STEP을 내리고 헤더 오른쪽을 버튼에 넘긴다. */
+  /* 버튼이 없는 화면(시작)에서도 자리를 남긴다 */
+  .hdr-nav { display: flex; gap: 8px; margin-left: auto; min-height: 32px; }
+  .navbtn {
+    height: 32px; padding: 0 13px; border-radius: 9999px; border: 1px solid var(--line);
+    background: #fff; color: var(--ink-2); font-size: 12.5px; font-weight: 500; cursor: pointer;
+    white-space: nowrap; transition: .15s;
+  }
+  .navbtn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-dark); }
+  .navbtn.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-dark); }
+  .navbtn:disabled { opacity: .45; cursor: not-allowed; background: var(--done); }
+  /* 한 번 눌러 확인을 기다리는 상태 — 되돌릴 수 없는 동작임을 색으로 알린다 */
+  .navbtn.armed { border-color: #c0392b; background: #fdeeee; color: #a5301f; font-weight: 600; }
+  /* 버튼 이름은 넓은 화면용·좁은 화면용을 함께 넣고 하나만 보인다 */
+  .lbl-narrow { display: none; }
+  /* STEP·진행바·빵가루를 한 줄에 둔다. 줄 높이는 가장 높은 알약(24px)이 정하며,
+     진행 표시를 감출 때도 자리는 남아 화면마다 헤더 높이가 같다. */
+  .bar-row { display: flex; align-items: center; gap: 14px; min-height: 24px; }
+  .prog { display: flex; align-items: center; gap: 12px; flex: 1 1 120px; min-width: 96px; }
+  /* 좁은 화면에서는 버튼이 항상 제 줄을 차지한다 — 줄바꿈에 맡기면 시작 화면(버튼 없음)과
+     나머지 화면의 헤더 높이가 달라진다. 폭을 100%로 못 박아 늘 두 줄로 만든다. */
+  @media (max-width: 620px) {
+    .lbl-wide { display: none; }
+    .lbl-narrow { display: inline; }
+    .navbtn { height: 29px; padding: 0 10px; font-size: 12px; }
+    .hdr-nav { gap: 6px; }
+    /* 버튼 4개는 좁은 화면에 한 줄로 안 들어간다. 줄바꿈에 맡기면 화면마다 헤더 높이가
+       달라지므로, 한 줄을 유지하고 넘치는 만큼 가로로 밀어 둔다. */
+    .hdr-nav {
+      width: 100%; justify-content: flex-start; min-height: 29px;
+      flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+    }
+    .hdr-nav::-webkit-scrollbar { display: none; }
+    .navbtn { flex: none; }
+    /* 한 줄에 셋이 들어가면 진행바가 먼저 짜부라진다. 최소 폭을 주고 빵가루를 양보시킨다
+       (빵가루는 넘치면 띠 안에서 가로로 밀리므로 잘려도 읽을 수 있다). */
+    .prog { flex: 1 1 auto; min-width: 140px; }
+    .bar { min-width: 52px; }
+    .crumbs { max-width: 48%; }
+  }
+
+  /* ── 시작 화면 — 두 갈래를 화면 절반씩 나눠 놓는다 ──
+     높이를 고정하지 않고 내용 높이대로 흐르게 둔다. 고정 높이(440px)를 주면 화면이 짧을 때
+     스크롤이 생기고, 길 때는 카드 아래 여백이 남았다. 백분율 높이도 쓰지 않는다 —
+     아티팩트 프레임에서는 기준 높이가 확정되지 않아 0으로 접힌다. */
+  .pane-start { display: flex; flex-direction: column; gap: 18px; }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; min-height: 190px; }
+  .split-card {
+    display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 10px;
+    padding: 30px 26px; border-radius: 18px; border: 1px solid var(--line); background: #fff;
+    cursor: pointer; font-family: inherit; color: inherit; transition: .18s;
+  }
+  .split-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .split-title { font-size: 25px; font-weight: 700; letter-spacing: -.4px; }
+  .split-desc { font-size: 14px; line-height: 1.65; color: var(--ink-3); }
+  .split-meta { font-size: 12px; color: var(--muted); }
+  .split-go { margin-top: auto; font-size: 14px; font-weight: 600; color: var(--accent); }
+  /* 시작 화면 하단 장식.
+     크기를 vh로 두면 안 된다 — 아티팩트는 프레임 높이를 내용에 맞춰 조절하므로
+     vh가 0에 가깝게 잡혀 이미지가 사라진다. 절대 단위로 고정한다. */
+  .mascots { flex: 0 0 auto; display: flex; justify-content: center; }
+  .mascots img { width: auto; height: auto; max-width: 400px; max-height: 176px; }
+  @media (max-width: 620px) {
+    .split { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; min-height: 300px; }
+    .split-card { padding: 20px 18px; gap: 8px; }
+    .split-title { font-size: 22px; }
+    .mascots img { max-width: 280px; max-height: 124px; }
+  }
+
+  /* ── FP센터 ── */
+  .fp-top { display: grid; grid-template-columns: 300px 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 620px) { .fp-top { grid-template-columns: 1fr; } }
+  .fp-map { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 14px 10px; }
+  /* 개략도는 실제 축척이므로 확대하면 세로로 길어진다. 원래 크기를 넘기지 않고 가운데 둔다. */
+  .fp-map svg { display: block; width: 100%; max-width: 300px; height: auto; margin: 0 auto; }
+  .fp-land { fill: var(--chip); stroke: #d6ccbe; stroke-width: 1; }
+  .fp-pin { fill: var(--accent); stroke: #fff; stroke-width: 1.4; }
+  .fp-pin.sel { fill: #14161a; }
+  .fp-hit { fill: transparent; cursor: pointer; }
+  .fp-label { font-size: 10.5px; font-weight: 500; fill: var(--ink-2); pointer-events: none; }
+  .fp-label.sel { font-weight: 700; fill: var(--ink); }
+  .fp-lead { stroke: #cbc1b2; stroke-width: .8; }
+  .fp-cap { font-size: 12px; line-height: 1.6; color: var(--muted-2); margin-top: 10px; }
+  .fp-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .fp-btn {
+    height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid var(--accent);
+    background: var(--accent); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .fp-btn:disabled { opacity: .55; cursor: default; }
+  .fp-msg { margin-top: 12px; padding: 12px 14px; border-radius: 10px; font-size: 13px; line-height: 1.6; }
+  .fp-msg.info { background: var(--accent-soft); color: #0a3f7e; }
+  .fp-msg.warn { background: #fdf4e7; color: #6b4a13; }
+  .fp-list { display: flex; flex-direction: column; gap: 9px; }
+  .fp-card {
+    padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line); background: #fff;
+    display: flex; flex-direction: column; gap: 5px; cursor: pointer;
+  }
+  .fp-card.sel { border-color: var(--accent); background: var(--accent-soft); }
+  .fp-card-top { display: flex; align-items: baseline; gap: 10px; }
+  .fp-name { font-size: 15px; font-weight: 600; color: var(--ink); }
+  .fp-dist { font-size: 13px; font-weight: 600; color: var(--accent-dark); margin-left: auto; font-variant-numeric: tabular-nums; }
+  .fp-addr { font-size: 12.5px; line-height: 1.55; color: var(--muted); }
+  .fp-links { display: flex; gap: 14px; margin-top: 3px; }
+  .fp-links a { font-size: 12.5px; font-weight: 500; color: var(--accent); text-decoration: none; }
+  .fp-links a:hover { text-decoration: underline; }
+  .fp-src { margin-top: 26px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 11.5px; line-height: 1.7; color: var(--muted-2); }
+
+  /* ── 종합 검토 결과 ── */
+  .sum-meta { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+  .sum-meta span + span::before { content: '·'; margin-right: 12px; color: var(--track); }
+  .sum-list { display: flex; flex-direction: column; gap: 12px; }
+  .sum-card { padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+  .sum-top { display: flex; align-items: center; gap: 11px; margin-bottom: 11px; }
+  .sum-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .sum-card.editing { border-color: var(--accent); }
+  /* 카드 안에 들어간 수정 패널은 카드보다 한 단 눌러 보이게 한다 */
+  .sum-card .edit-panel { background: var(--bg); border-color: var(--line-2); padding: 18px; }
+  .sum-card .edit-panel .num { background: #fff; }
+  .sum-card .edit-panel .opt { background: #fff; }
+  .sum-name { font-size: 15px; font-weight: 600; color: var(--ink); }
+  .sum-amt { font-size: 26px; font-weight: 700; letter-spacing: -.5px; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .sum-sub { font-size: 12.5px; line-height: 1.6; color: var(--muted-2); margin-top: 5px; }
+  .sum-sec { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line-2); }
+  .sum-h { font-size: 10.5px; letter-spacing: 1.3px; font-weight: 500; color: var(--muted); margin-bottom: 8px; }
+  .sum-kv { display: grid; grid-template-columns: 1fr auto; gap: 5px 14px; margin: 0; font-size: 12.5px; }
+  .sum-kv dt { color: var(--muted-2); }
+  .sum-kv dd { margin: 0; text-align: right; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .sum-notes { margin: 0; padding-left: 17px; }
+  .sum-notes li { font-size: 12px; line-height: 1.65; color: var(--ink-3); }
+
+  /* ── 인쇄 ─────────────────────────────────────────────────────────────────
+     전문가 검토에 넘길 출력물. 조작용 요소(상단 버튼·이전/다음·펼치기)는 종이에
+     의미가 없으므로 숨기고, 카드가 페이지 사이에서 잘리지 않게 한다. */
+  @media print {
+    html, body { background: #fff; }
+    .hdr-nav, .bar-row, .cta-in, .no-print, .navbtn,
+    .edit-toggle, .next-item, .cta, .cta-prev { display: none !important; }
+    main, .pane { padding: 0 !important; max-width: none !important; }
+    .sum-card, .block, .warn, .tbl-wrap { break-inside: avoid; page-break-inside: avoid; }
+    a[href^="http"]::after { content: ""; }   /* URL 꼬리표를 붙이지 않는다 */
+    /* 인쇄물에는 개산임을 반드시 남긴다 */
+    .sum-list::after, .res-card::after {
+      content: '이 문서는 참고용 개산입니다. 확정 세액은 전문가 검토가 필요합니다.';
+      display: block; margin-top: 14px; padding-top: 10px;
+      border-top: 1px solid #ccc; font-size: 11px; color: #555;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-in">
+    <div class="hdr-row">
+      <img class="hdr-logo" src="assets/samsunglife.png" alt="삼성생명">
+      <div class="hdr-title">AI 세무사</div>
+      <div class="hdr-nav" id="hdrNav"></div>
+    </div>
+    <div class="bar-row">
+      <span class="prog" id="prog">
+        <span class="hdr-step" id="stepText">STEP 1 / 5</span>
+        <span class="bar"><i id="bar" style="width:20%"></i></span>
+      </span>
+      <div class="crumbs" id="crumbs"></div>
+    </div>
+  </div>
+</header>
+
+<main id="main"></main>
+
+<div class="cta-bar" id="ctaBar"><div class="cta-in" id="ctaIn"></div></div>
+
+<script src="calc.js"></script>
+<script src="fp.js"></script>
+<script>
+'use strict';
+
+// 세법 자료 기준일자 (원칙 §3 — 기준일자 관리)
+const BASIS_DATE = '2026-08-19';
+const MANWON = 10000;
+
+// 적용 기준 선택지 — 표시 라벨과 계산 모듈 인자의 대응.
+// 개편안은 입법 확정 전이므로 기본값은 항상 현행이며 심화 모드에서만 선택할 수 있다 (제약 C5).
+
+// ══════════════════════════ 표시 포맷 (화면 계층 전용 책임) ══════════════════════════
+
+// FR-04 — 1억원 미만은 "N,NNN만원", 1억원 이상은 "N억 N,NNN만원"
+function formatWon(won) {
+  // 숫자가 아니면 'NaN만원'을 그리지 않는다. 금액은 전부 이 함수를 지나므로
+  // 총액·계산 과정·표·힌트가 한 번에 막힌다.
+  // (calc.js 의 결과 검증은 module.exports 경로에만 걸린다 — 브라우저는 함수를 직접 부른다.)
+  if (!Number.isFinite(won)) return '—';
+  const rounded = Math.round(won);
+  const sign = rounded < 0 ? '-' : '';
+  const abs = Math.abs(rounded);
+  if (abs > 0 && abs < MANWON) return sign + abs.toLocaleString('ko-KR') + '원';
+  let eok = Math.floor(abs / 100000000);
+  let manwon = Math.round((abs % 100000000) / MANWON);
+  if (manwon >= 10000) { eok += 1; manwon -= 10000; }
+  if (eok > 0 && manwon > 0) return sign + eok.toLocaleString('ko-KR') + '억 ' + manwon.toLocaleString('ko-KR') + '만원';
+  if (eok > 0) return sign + eok.toLocaleString('ko-KR') + '억원';
+  return sign + manwon.toLocaleString('ko-KR') + '만원';
+}
+const W = formatWon;
+const E = (won) => Math.round(won).toLocaleString('ko-KR') + '원';   // 1주당 금액처럼 원 단위 정밀도가 필요한 값
+const N = (v) => Math.round(v).toLocaleString('ko-KR');
+// 입력란 표시용 천단위 구분. 문자열 단위로 처리하므로 자릿수 제한이 없다.
+const withCommas = (digits) => String(digits).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+const PCT = (rate) => Math.round(rate * 100) + '%';
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+// ══════════════════════════ 검토 항목 정의 ══════════════════════════
+// 금액 필드는 unit: '만원' 으로 표시하고, 계산 모듈에는 원 단위로 환산해 넘긴다.
+// adv: 심화 모드에서만 노출. simple: 간편 모드에서 대신 적용할 법정 기본 가정값.
+
+// 자녀별 입력 셀은 자녀 수에 연동해 만들어진다. 심화 모드에서만 노출된다.
+const MAX_CHILD_ROWS = 12;   // 화면이 감당할 수 있는 상한
+
+// 자녀 수는 필드 목록 자체를 좌우하므로 accessor를 거치지 않고 상태에서 직접 읽는다
+// (accessor가 필드 목록을 참조하므로 순환을 피한다).
+function childCount() {
+  const raw = state.vals.children;
+  const n = (raw === undefined || raw === '') ? 2 : (Number(raw) || 0);
+  return Math.min(Math.max(0, n), MAX_CHILD_ROWS);
+}
+
+function childRowFields() {
+  const rows = [];
+  for (let i = 0; i < childCount(); i += 1) {
+    const nth = '자녀 ' + (i + 1);
+    rows.push({
+      k: 'childBirth' + i, label: nth + ' 생년월일', type: 'date', adv: true,
+      derive: (v) => { const a = ageFromBirth(v, inheritRefDate()); return a === null ? '' : '만 ' + a + '세'; },
+      sec: i === 0 ? '자녀별 정보' : undefined,
+      hint: i === 0 ? [
+        '8자리로 입력하면 오른쪽에 상속개시일 기준 만 나이가 표시됩니다.',
+        '만 19세 미만이면 미성년자공제가 자동 반영됩니다 — 1,000만원 × 19세까지의 잔여연수',
+      ] : undefined,
+    });
+    rows.push({
+      k: 'childDisabled' + i, label: nth + ' 장애인', type: 'choice',
+      opts: ['아니오', '예'], def: '아니오', adv: true,
+    });
+    // 기대여명은 완전생명표의 성별·연령별 조회값이다 (상증령 제18조).
+    // 나이만으로는 정해지지 않으므로 장애인인 경우에만 성별을 추가로 받고, 연수는 표에서 조회한다.
+    if (state.vals['childDisabled' + i] === '예') {
+      rows.push({
+        k: 'childSex' + i, label: nth + ' 성별', type: 'choice',
+        opts: ['남', '여'], def: '남', adv: true,
+        hint: '기대여명이 성별로 갈립니다 — 아래 조회값이 즉시 바뀝니다',
+      });
+      rows.push({
+        k: 'childLife' + i, label: nth + ' 기대여명 (자동 조회)', unit: '년', adv: true,
+        type: 'readonly',
+        value: (g) => {
+          const a = ageFromBirth(g.raw('childBirth' + i), inheritRefDate());
+          return a === null ? '' : lookupLifeExpectancy(g.pick('childSex' + i), a).toFixed(2);
+        },
+        hint: (g) => {
+          const a = ageFromBirth(g.raw('childBirth' + i), inheritRefDate());
+          if (a === null) return ['생년월일을 입력하면 기대여명이 자동으로 조회됩니다.'];
+          const sex = g.pick('childSex' + i);
+          const life = lookupLifeExpectancy(sex, a);
+          return [
+            '완전생명표(1세별) ' + LIFE_TABLE_YEAR + '년 기준 '
+              + (sex === '여' ? '여자' : '남자') + ' ' + a + '세 조회값입니다.',
+            // 금액은 calc.js 의 상수에서 가져온다 — 화면에 법정 수치를 두면 제1조 위반이고,
+            // 법이 바뀔 때 두 곳을 고쳐야 해서 어긋난다.
+            '장애인공제 = ' + W(DISABLED_DEDUCTION_PER_YEAR) + ' × ' + life.toFixed(2)
+              + '년 = ' + W(life * DISABLED_DEDUCTION_PER_YEAR),
+          ];
+        },
+        link: { label: 'KOSIS 완전생명표(DT_1B42) 확인 →', url: 'https://kosis.kr/statHtml/statHtml.do?orgId=101&tblId=DT_1B42' },
+      });
+    }
+  }
+  return rows;
+}
+
+// 상속세는 자녀 수에 따라 필드가 늘어난다.
+function allFields() {
+  const item = itemOf(state.item);
+  return state.item === 'inherit' ? item.fields.concat(childRowFields()) : item.fields;
+}
+
+// 상속세 입력 매핑. run()과 동적 힌트가 같은 입력을 쓰도록 한 곳에 둔다.
+// 채무는 두 필드로 받는다 — 과세가액 차감분(debt, 채무 전액)과
+// 순금융재산 차감분(financialDebt, 그중 금융기관 채무)은 상증법상 범위가 다르다.
+function inheritInput(g) {
+  // 간편 모드에서는 자녀별 입력을 받지 않으므로 미성년자·장애인 공제를 산입하지 않는다.
+  const deep = state.mode === 'deep';
+  const refDate = inheritRefDate();
+  const ages = [];
+  const disabledLives = [];
+  if (deep) {
+    const n = Math.min(Math.max(0, g.num('children')), MAX_CHILD_ROWS);
+    for (let i = 0; i < n; i += 1) {
+      // 생년월일이 없으면 그 자녀는 나이 판정 대상에서 제외한다 (임의 나이를 가정하지 않는다).
+      const childAge = ageFromBirth(g.raw('childBirth' + i), refDate);
+      if (childAge === null) continue;
+      ages.push(childAge);
+      if (g.pick('childDisabled' + i) === '예') {
+        disabledLives.push(lookupLifeExpectancy(g.pick('childSex' + i), childAge));
+      }
+    }
+  }
+  return {
+    realEstate: g.won('re'), cash: g.won('cash'), other: g.won('etc'),
+    hasSpouse: g.pick('spouse') === '있음', numChildren: g.num('children'),
+    debt: g.won('debt'),
+    // 금융기관 채무는 채무 합계의 부분집합이므로 합계를 넘어설 수 없다.
+    financialDebt: Math.min(g.won('finDebt'), g.won('debt')),
+    funeralCost: g.won('funeral'),
+    priorGift: g.won('pregift'),
+    actualSpouseShare: g.won('spouseActual') > 0 ? g.won('spouseActual') : null,
+    minorYearsTotal: calculateMinorYearsTotal(ages),
+    numElderly: g.num('elders'),
+    disabledYearsTotal: disabledLives.reduce((sum, y) => sum + y, 0),
+    // 세대생략 할증은 상담자가 대습상속 여부를 판정한 뒤 넣는 값이므로 심화 모드에서만 받는다.
+    generationSkipShare: deep ? g.won('skipShare') : 0,
+    isGenerationSkipMinor: g.pick('skipMinor') === '예',
+  };
+}
+
+const ITEMS = [
+  {
+    key: 'inherit', name: '상속세', desc: '일괄/인적공제 자동 유리선택 · 1·2차 상속 합계',
+    fields: [
+      {
+        k: 'deathDate', label: '상속개시일', type: 'date', adv: true, sec: '상속 개요',
+        placeholder: '20240314', derive: formatDate,
+        hint: [
+          '미성년자공제·장애인 기대여명의 나이 판정 기준일입니다.',
+          '비워두면 오늘 날짜를 기준으로 계산합니다.',
+        ],
+      },
+      { k: 're', label: '부동산', unit: '만원', sec: '상속재산' },
+      {
+        k: 'cash', label: '금융자산(현금)', unit: '만원',
+        hint: (g) => {
+          const b = calculateInheritanceTax(inheritInput(g)).breakdown;
+          return [
+            '금융재산상속공제 기준 — 순금융재산의 20%, 한도 2억원',
+            '20%가 2,000만원 미만이면 순금융재산 전액을 공제하되 최대 2,000만원까지 인정됩니다.',
+            '현재 순금융재산 ' + W(b.netFinancialAsset) + ' → 공제 ' + W(b.financialDeduction),
+          ];
+        },
+      },
+      { k: 'etc', label: '기타자산', unit: '만원' },
+      {
+        k: 'debt', label: '채무 합계', unit: '만원',
+        hint: [
+          '대출·임대보증금 등 피상속인의 채무 전액입니다.',
+          '상속세 과세가액에서 차감됩니다.',
+        ],
+      },
+      {
+        // 상증법 제22조의 순금융재산은 금융재산에서 금융채무만 뺀 값이다.
+        // 임대보증금 등 비금융채무는 과세가액에서만 차감되고 순금융재산에서는 빼지 않는다.
+        k: 'finDebt', label: '그중 금융기관 채무', unit: '만원',
+        hint: (g) => {
+          const b = calculateInheritanceTax(inheritInput(g)).breakdown;
+          return [
+            '금융재산상속공제의 순금융재산에서만 추가로 차감되는 부분입니다 (상증법 제22조).',
+            '임대보증금·사인간 채무는 여기 넣지 않습니다 — 위 채무 합계에서 이미 차감됩니다.',
+            '현재 순금융재산 ' + W(b.netFinancialAsset) + ' → 공제 ' + W(b.financialDeduction),
+          ];
+        },
+      },
+      { k: 'spouse', label: '배우자', type: 'choice', opts: ['있음', '없음'], def: '있음', sec: '상속인' },
+      { k: 'children', label: '자녀 수', unit: '명', def: 2 },
+      {
+        // 이 값 하나가 1차 배우자상속공제와 2차 상속재산을 함께 결정한다.
+        // 공제액은 상한 30억·하한 5억에 걸리므로 취득액의 대리값으로 쓸 수 없다.
+        k: 'spouseActual', label: '배우자 실제 상속액', unit: '만원', adv: true,
+        sec: '배우자 자산 (2차 상속 검토)',
+        hint: (g) => {
+          if (g.pick('spouse') !== '있음') return ['배우자가 없어 배우자상속공제가 적용되지 않습니다.'];
+          const b = calculateInheritanceTax(inheritInput(g)).breakdown;
+          const lines = [
+            '협의분할로 배우자가 실제로 가져가는 금액입니다. 1차 배우자상속공제와 2차 상속재산에 함께 반영됩니다.',
+            '미입력 시 법정상속분 ' + W(b.statutoryShare) + '을 취득한다고 가정합니다.',
+          ];
+          // 상한·하한에 걸리는 사례에서는 두 금액이 어긋난다는 사실을 그 자리에서 알린다.
+          if (b.statutoryShare > b.spouseDeduction) {
+            lines.push('현재 법정상속분이 배우자상속공제액 ' + W(b.spouseDeduction)
+              + '보다 ' + W(b.statutoryShare - b.spouseDeduction) + ' 큽니다 (공제 상한 30억원). '
+              + '2차 상속재산은 공제액이 아니라 취득액 기준입니다.');
+          } else if (b.statutoryShare < b.spouseDeduction) {
+            lines.push('현재 배우자상속공제액은 하한 5억원이 적용되어 '
+              + W(b.spouseDeduction) + '이지만, 취득액은 그보다 작습니다.');
+          }
+          return lines;
+        },
+      },
+      {
+        k: 'spouseAsset', label: '배우자 고유재산', unit: '만원',
+        sec: '배우자 자산 (2차 상속 검토)',
+        hint: (g) => (g.pick('spouse') !== '있음'
+          ? ['배우자가 없어 2차 상속 검토 대상이 아닙니다.']
+          : [
+            '위 상속재산과 별개로 배우자가 이미 보유한 재산입니다.',
+            '이 재산에 1차 상속에서 배우자가 취득하는 재산을 더해 2차 상속세(배우자 사망 시)를 함께 산출합니다.',
+            '비워두면 1차에서 취득하는 재산만으로 2차 상속세를 봅니다.',
+          ]),
+      },
+      {
+        k: 'spouseFin', label: '그중 금융자산', unit: '만원', adv: true,
+        hint: [
+          '2차 상속의 금융재산상속공제(순금융재산의 20%, 한도 2억원) 판정에 쓰입니다.',
+          '비워두면 배우자 고유재산 전액을 기타자산으로 보아 금융재산공제를 적용하지 않습니다 — 세액이 보수적으로(크게) 나옵니다.',
+        ],
+      },
+      { k: 'funeral', label: '장례비용', unit: '만원', adv: true, sec: '세부 옵션', hint: '최대 1,000만원까지 인정' },
+      { k: 'pregift', label: '사전증여재산', unit: '만원', adv: true, hint: '10년 내 상속인 증여분' },
+      {
+        k: 'skipShare', label: '손자녀 등 세대생략 상속분', unit: '만원', adv: true,
+        hint: (g) => {
+          const r = calculateInheritanceTax(inheritInput(g));
+          if (r.generationSkipSurcharge <= 0) {
+            return [
+              '자녀를 건너뛰어 손자녀 등 직계비속이 상속·유증받는 금액입니다 (상증법 제27조).',
+              '입력하면 산출세액에 30%가 가산됩니다 — 취득비율만큼만 가산됩니다.',
+              '대습상속(자녀가 먼저 사망해 손자녀가 대신 상속)은 할증 대상이 아니므로 넣지 않습니다.',
+            ];
+          }
+          return [
+            '취득비율 ' + PCT(r.generationSkipRatio) + ' × 할증률 ' + PCT(r.generationSkipRate),
+            '할증액 ' + W(r.generationSkipSurcharge) + ' 가산',
+            '대습상속이면 할증 대상이 아니므로 이 칸을 비웁니다.',
+          ];
+        },
+      },
+      {
+        k: 'skipMinor', label: '세대생략 상속인 미성년자', type: 'choice',
+        opts: ['아니오', '예'], def: '아니오', adv: true,
+        hint: '미성년자가 20억원을 초과해 취득하면 할증률이 30% → 40%로 올라갑니다',
+      },
+      {
+        k: 'elders', label: '65세 이상 부양가족 수', unit: '명', adv: true,
+        hint: [
+          '연로자공제 — 1인당 5,000만원',
+          '배우자를 제외한 상속인·동거가족 중 만 65세 이상인 사람이 대상입니다.',
+        ],
+      },
+    ],
+    // 기본 게이트는 첫 만원 필드(부동산)만 본다. 그러면 현금·예금만 있는 고객은
+    // 결과를 볼 수 없고, 금융자산을 부동산 칸에 넣어 우회하면
+    // 금융재산 상속공제(상증법 제22조, 한도 2억원)가 사라져 세액이 과대 계상된다.
+    // 그래서 상속재산 합계로 판정한다.
+    ready(g) {
+      const total = g.num('re') + g.num('cash') + g.num('etc');
+      if (!(total > 0)) return { ok: false, label: '상속재산을 입력하세요' };
+      return { ok: true, label: '결과 보기' };
+    },
+    run(g) {
+      const r = calculateInheritanceTax(inheritInput(g));
+      const b = r.breakdown;
+      const steps = [
+        ['총 상속재산가액', W(r.totalEstate), '부동산 + 금융 + 기타'],
+        ['과세가액', W(r.taxableValue), '재산 − 채무 − 장례비(1,000만원 한도) + 사전증여'],
+        [b.standardDeduction === b.lumpSumDeduction ? '일괄공제 (유리)' : '기초+인적공제 (유리)',
+          '− ' + W(b.standardDeduction),
+          '일괄 ' + W(b.lumpSumDeduction) + ' vs 기초·인적 ' + W(b.personalDeduction)],
+      ];
+      const inp = inheritInput(g);
+      if (inp.minorYearsTotal > 0 || inp.disabledYearsTotal > 0 || inp.numElderly > 0) {
+        const parts = [];
+        if (inp.minorYearsTotal > 0) parts.push('미성년자 잔여 ' + inp.minorYearsTotal + '년');
+        if (inp.numElderly > 0) parts.push('65세 이상 ' + inp.numElderly + '명');
+        if (inp.disabledYearsTotal > 0) {
+          parts.push('장애인 기대여명 ' + inp.disabledYearsTotal.toFixed(2) + '년');
+        }
+        const ref = inheritRefDate();
+        steps.push(['└ 인적공제 내역', parts.join(' · '),
+          '자녀 ' + inp.numChildren + '명 5,000만원/인 + 미성년자 1,000만원/년 + 연로자 5,000만원/인 + 장애인 1,000만원/년'
+          + ' · 나이는 ' + (formatDate(ref) || '오늘') + ' 기준'
+          + (inp.disabledYearsTotal > 0 ? ' · 기대여명은 완전생명표(1세별) ' + LIFE_TABLE_YEAR + '년 기준' : '')]);
+      }
+      if (b.spouseDeduction > 0) {
+        steps.push(['배우자상속공제', '− ' + W(b.spouseDeduction),
+          'min(실제 ' + W(b.spouseShare) + ', 법정 ' + W(b.statutoryShare) + ', 30억) · 최소 5억']);
+      }
+      steps.push(['금융재산상속공제', '− ' + W(b.financialDeduction),
+        '순금융재산 ' + W(b.netFinancialAsset) + ' × 20%, 한도 2억']);
+      steps.push(['과세표준', W(r.taxBase), '']);
+      steps.push(['산출세액', W(r.calculatedTax), '5단계 누진세율 10~50% 적용']);
+      if (r.generationSkipSurcharge > 0) {
+        steps.push(['세대생략 할증', '+ ' + W(r.generationSkipSurcharge),
+          '산출세액 × 세대생략 취득비율 ' + PCT(r.generationSkipRatio)
+          + ' × ' + PCT(r.generationSkipRate)
+          + (r.generationSkipRate === 0.4 ? ' (미성년자 20억원 초과)' : '')]);
+      }
+      steps.push(['신고세액공제', '− ' + W(r.reportDeduction),
+        (r.generationSkipSurcharge > 0 ? '(산출세액 + 할증액)' : '산출세액') + ' × 3%']);
+
+      // 배우자가 있으면 2차 상속(배우자 사망)까지 자동으로 산출한다.
+      // 배우자상속공제는 세금을 없애는 것이 아니라 2차 상속으로 미루는 장치이므로,
+      // 1차 세액만 보면 절세 효과를 과대평가하게 된다.
+      const tables = [];
+      const notes = [];
+      // 동거주택 상속공제(상증법 제23조의2)는 계산에 넣지 않았다 (2026-08-21 소유자 결정,
+      // 감사 E-2 범위 제외). 요건에 해당하면 세액이 실제보다 크게 나오므로 그 사실을 알린다.
+      notes.push('동거주택 상속공제(상증법 제23조의2)는 반영하지 않았습니다. '
+        + '무주택 상속인이 피상속인과 10년 이상 동거한 주택은 상속가액 전액(한도 6억원)이 '
+        + '추가로 공제될 수 있어, 해당 사례에서는 위 세액이 실제보다 크게 나옵니다. '
+        + '요건 판정이 필요하면 전문가 검토를 받으세요.');
+      if (inp.hasSpouse && b.spouseDeduction > 0) {
+        const s = calculateSecondaryInheritance({
+          first: r,
+          // 2차에 넘어가는 재산은 공제액이 아니라 배우자가 실제로 취득하는 재산이다.
+          // 미입력(null)이면 법정상속분을 취득한다고 가정한다.
+          spouseAcquired: inp.actualSpouseShare,
+          spouseOwnAsset: g.won('spouseAsset'),
+          spouseOwnFinancial: Math.min(g.won('spouseFin'), g.won('spouseAsset')),
+          numChildren: inp.numChildren,
+        });
+        const row = (name, estate, base, tax, cls) => ({
+          cells: [name, W(estate), W(base), W(tax)], on: cls === 'on', sum: cls === 'sum',
+        });
+        tables.push({
+          label: '1차 · 2차 상속세 합계',
+          head: ['구분', '상속재산', '과세표준', '상속세'],
+          rows: [
+            row('1차 — 본인 사망', r.totalEstate, r.taxBase, r.finalTax, 'on'),
+            row('2차 — 배우자 사망', s.secondEstate, s.second.taxBase, s.secondTax),
+            { cells: ['합계', '—', '—', W(s.totalTax)], sum: true },
+          ],
+          note: '2차 상속재산 ' + W(s.secondEstate) + ' = 배우자가 1차에서 취득하는 재산 '
+            + W(s.transferred) + (s.spouseOwnAsset > 0 ? ' + 배우자 고유재산 ' + W(s.spouseOwnAsset) : '')
+            + '. 2차에는 배우자가 없어 배우자상속공제가 없고 상속인은 자녀 ' + inp.numChildren + '명입니다.',
+        });
+        // 2차에 얼마를 넘길지가 이 항목에서 가장 크게 갈리는 값이므로 두 기준을 나란히 보여준다.
+        // 공제액은 상한 30억·하한 5억·법정상속분 한도에 걸려 취득액과 어긋날 수 있다.
+        tables.push({
+          label: '2차 상속재산 산정 — 배우자 취득 재산 기준',
+          head: ['구분', '금액', '2차 반영'],
+          rows: [
+            { cells: ['법정상속분 (배우자 1.5 : 자녀 1인 1)', W(s.statutoryShare),
+              s.usesStatutoryShare ? '반영' : '—'], on: s.usesStatutoryShare },
+            { cells: ['배우자상속공제액 (상한 30억 · 하한 5억)', W(s.spouseDeduction), '—'] },
+            (s.usesStatutoryShare
+              ? { cells: ['배우자 실제 상속액 (미입력)', '—', '—'] }
+              : { cells: ['배우자 실제 상속액 (입력값)', W(s.transferred), '반영'], on: true }),
+            { cells: ['배우자 고유재산', W(s.spouseOwnAsset), s.spouseOwnAsset > 0 ? '반영' : '—'] },
+            { cells: ['2차 상속재산 합계', W(s.secondEstate), ''], sum: true },
+          ],
+          note: '2차에 넘어가는 재산은 배우자상속공제액이 아니라 배우자가 실제로 취득하는 재산입니다. '
+            + '공제액은 상한 30억원·하한 5억원·법정상속분 한도에 걸리므로 취득액과 다를 수 있습니다'
+            + (s.transferred > s.spouseDeduction
+              ? ' — 이 사례는 취득액이 공제액보다 ' + W(s.transferred - s.spouseDeduction) + ' 큽니다.'
+              : (s.transferred < s.spouseDeduction
+                ? ' — 이 사례는 취득액이 공제액보다 ' + W(s.spouseDeduction - s.transferred) + ' 작습니다.'
+                : ' — 이 사례는 두 금액이 같습니다.')),
+        });
+        notes.push(s.usesStatutoryShare
+          ? '2차 상속재산은 배우자가 법정상속분 ' + W(s.statutoryShare)
+            + '을 취득한다고 가정해 산출했습니다. 협의분할로 취득액이 정해졌다면 심화 모드의 '
+            + '「배우자 실제 상속액」에 넣으세요 — 1차 배우자상속공제와 2차 상속재산에 함께 반영됩니다.'
+          : '2차 상속재산은 입력한 배우자 실제 상속액 ' + W(s.transferred) + '을 기준으로 산출했습니다. '
+            + '1차 배우자상속공제는 ' + W(s.spouseDeduction) + '이며, 상한 30억원·하한 5억원·법정상속분 '
+            + '한도가 적용되므로 취득액과 다를 수 있습니다.');
+        notes.push('1차 상속세를 배우자가 부담한 경우 그만큼 2차 상속재산이 줄지만, 납부 주체를 알 수 없어 차감하지 않았습니다. 2차 세액은 그만큼 크게 나옵니다.');
+        notes.push('배우자 고유재산의 자산 구성(부동산·금융·기타)과 배우자의 채무·사전증여, 2차 상속 시점의 재산 증감은 반영하지 않았습니다.');
+      }
+      return {
+        total: r.finalTax, label: '예상 상속세 (1차)', sub: '과세표준 ' + W(r.taxBase),
+        steps: steps, tables: tables, notes: notes,
+      };
+    },
+  },
+  {
+    key: 'gift', name: '증여세 (부담부증여)', desc: '채무인수분 양도세 분리 · 10년 합산',
+    fields: [
+      { k: 'value', label: '증여재산가액', unit: '만원', sec: '증여 내역' },
+      { k: 'debt', label: '수증자 인수 채무액', unit: '만원', hint: ['이 금액만큼은 증여가 아니라 유상양도로 봅니다.', '증여자에게 양도소득세가 과세됩니다.'] },
+      { k: 'rel', label: '증여자와의 관계', type: 'choice', opts: ['배우자', '직계존비속', '기타친족'], def: '직계존비속' },
+      {
+        k: 'relDed', label: '증여재산공제 적용', type: 'choice', opts: ['적용', '미적용'], def: '적용',
+        hint: [
+          '10년 내 같은 관계에서 공제 한도를 이미 소진했으면 「미적용」을 선택하세요.',
+          '배우자 6억원 / 직계존비속 5,000만원(미성년 2,000만원) / 기타친족 1,000만원',
+        ],
+      },
+      { k: 'acquire', label: '증여재산 취득가액', unit: '만원', hint: '양도세 부분 계산에 사용' },
+      {
+        k: 'skip', label: '수증자가 손자녀 등', type: 'choice', opts: ['아니오', '예'], def: '아니오',
+        // 관계가 '직계존비속'일 때만 세대생략이 성립한다. 배우자·기타친족에는 제57조가 적용되지 않는다.
+        disabledOpts: (g) => (g.pick('rel') === '직계존비속' ? [] : ['예']),
+        hint: (g) => {
+          if (g.pick('rel') !== '직계존비속') {
+            return '세대생략 할증은 직계존비속 증여에만 적용됩니다 (상증법 제57조)';
+          }
+          return [
+            '자녀를 건너뛴 직계비속(손자녀 등)이면 「예」를 선택하세요.',
+            '산출세액에 30%가 가산되고, 미성년자가 20억원을 초과해 받으면 40%입니다.',
+            '수증자의 부모(증여자의 자녀)가 먼저 사망한 대습증여는 할증 대상이 아닙니다.',
+          ];
+        },
+      },
+      { k: 'prior', label: '10년 내 사전증여 합계', unit: '만원', adv: true, sec: '세부 옵션' },
+      {
+        k: 'giftDate', label: '증여일', type: 'date', adv: true,
+        placeholder: '20260314', derive: formatDate,
+        hint: [
+          '수증자 미성년 판정의 기준일입니다.',
+          '비워두면 오늘 날짜를 기준으로 계산합니다.',
+        ],
+      },
+      {
+        k: 'doneeBirth', label: '수증자 생년월일', type: 'date', adv: true,
+        derive: (v) => {
+          const a = ageFromBirth(v, giftRefDate());
+          return a === null ? '' : '만 ' + a + '세' + (isMinorAge(a) ? ' · 미성년' : '');
+        },
+        hint: (g) => {
+          const a = ageFromBirth(g.raw('doneeBirth'), giftRefDate());
+          if (a === null) return ['직계존비속 증여재산공제가 미성년 여부에 따라 갈립니다 — 성년 5,000만원 / 미성년 2,000만원'];
+          return [
+            '증여일 기준 만 ' + a + '세 → ' + (isMinorAge(a) ? '미성년' : '성년') + '으로 판정됩니다.',
+            '직계존비속 증여재산공제 ' + (isMinorAge(a) ? '2,000만원' : '5,000만원') + '이 적용됩니다.',
+          ];
+        },
+      },
+      { k: 'years', label: '증여자 보유기간', unit: '년', def: 10, adv: true },
+    ],
+    run(g) {
+      const r = calculateGiftTax({
+        giftValue: g.won('value'), assumedDebt: g.won('debt'), acquisitionCost: g.won('acquire'),
+        relation: g.pick('rel'),
+        isMinorRecipient: isMinorAge(ageFromBirth(g.raw('doneeBirth'), giftRefDate())),
+        priorGift: g.won('prior'), holdingYears: g.num('years'),
+        applyRelativeDeduction: g.pick('relDed') === '적용',
+        isGenerationSkip: g.pick('rel') === '직계존비속' && g.pick('skip') === '예',
+      });
+      const steps = [
+        ['증여재산가액', W(r.giftValue), ''],
+      ];
+      if (r.debtAssumed > 0) {
+        steps.push(['채무 인수액 (양도 간주)', '− ' + W(r.debtAssumed), '이 부분은 증여가 아니라 유상양도']);
+        steps.push(['순수 증여분', W(r.giftPortion), '']);
+      }
+      steps.push([g.pick('rel') + ' 증여재산공제', '− ' + W(r.relativeDeduction),
+        r.applyRelativeDeduction ? ''
+          : '미적용 선택 — 10년 내 공제 한도 소진 (적용 시 ' + W(r.fullRelativeDeduction) + ')']);
+      if (g.won('prior') > 0) {
+        steps.push(['10년 내 사전증여 합산', '+ ' + W(g.won('prior')), '기납부 상당액 ' + W(r.priorGiftTax) + ' 차감']);
+      }
+      if (r.generationSkipSurcharge > 0) {
+        steps.push(['세대생략 할증', '+ ' + W(r.generationSkipSurcharge),
+          '산출세액 ' + W(r.giftComputedTax) + ' × ' + PCT(r.generationSkipRate)
+          + (r.generationSkipRate === 0.4 ? ' (미성년자 20억원 초과)' : '')]);
+      }
+      steps.push(['증여세 (신고세액공제 3% 반영)', W(r.giftTax), '과세표준 ' + W(r.giftTaxBase) + ' × 누진세율']);
+      if (r.debtAssumed > 0) {
+        steps.push(['양도차익', W(r.transferGain),
+          '양도가 ' + W(r.debtAssumed) + ' − 대응 취득가 ' + W(r.acquisitionShare)
+          + (r.longTermRate > 0 ? ' · 장기보유 ' + PCT(r.longTermRate) : '')]);
+        steps.push(['양도소득세 (지방세 포함)', W(r.transferTax), '기본공제 250만원 차감 후 6~45%']);
+      }
+      return {
+        total: r.total, label: '증여세 + 양도세 합계',
+        sub: '증여 ' + W(r.giftTax) + ' · 양도 ' + W(r.transferTax), steps: steps,
+      };
+    },
+  },
+  {
+    key: 'jongbu', name: '종합부동산세', desc: '공시가격 합계 · 1세대1주택 공제',
+    fields: [
+      { k: 'pub', label: '주택 공시가격 합계', unit: '만원', sec: '보유 현황' },
+      {
+        k: 'houses', label: '주택 수', unit: '채', def: 1,
+        hint: '주택 수에 따라 아래 「1세대 1주택 단독명의」가 자동으로 정해집니다.',
+      },
+      {
+        // 주택 수에서 곧바로 따라오는 값이므로 선택을 받지 않는다.
+        // 1채 → 예, 2채 이상 → 아니오. 손으로 뒤집으면 기본공제와 세율표가 어긋난다.
+        k: 'single', label: '1세대 1주택 단독명의', type: 'readonly',
+        value: (g) => (g.num('houses') <= 1 ? '예 (자동)' : '아니오 (자동)'),
+        hint: (g) => (g.num('houses') <= 1
+          ? ['1주택이므로 기본공제 12억원과 2주택 이하 세율표(0.5~2.7%)가 적용됩니다.',
+            '공동명의라면 지분별로 각자 9억원씩 공제받는 편이 유리할 수 있어 별도 검토가 필요합니다.']
+          : [g.num('houses') + '채이므로 기본공제 9억원이 적용됩니다.',
+            g.num('houses') >= 3 ? '3주택 이상이라 중과세율(0.5~5.0%)이 적용됩니다.' : '2주택은 일반세율(0.5~2.7%)입니다.']),
+      },
+      { k: 'hold', label: '보유기간', unit: '년', def: 5, adv: true, sec: '세부 옵션' },
+      { k: 'ownerAge', label: '만 나이', unit: '세', adv: true, hint: '고령자 세액공제 판정' },
+      { k: 'ptax', label: '기납부 재산세 중복분', unit: '만원', adv: true },
+      // 개편안 계산에 필요한 값들. 결과는 항상 현행 기준으로 내고 개편안은 하단에 병기하므로
+      // '적용 기준'·'기준연도' 선택은 두지 않는다 — 선택으로 얻는 것이 없고 오해만 만든다.
+      {
+        k: 'resident', label: '해당 주택 거주', type: 'choice', opts: ['예', '아니오'], def: '예',
+        adv: true, sec: '개편안 비교용 입력',
+        // 개편안의 거주 판정은 1세대1주택 기본공제(14억/9억)에만 쓰인다.
+        // 다주택이면 이 공제 자체가 없으므로 '예'를 열어 두면 의미 없는 선택이 된다.
+        disabledOpts: (g) => (g.num('houses') > 1 ? ['예'] : []),
+        hint: (g) => (g.num('houses') > 1
+          ? [g.num('houses') + '채 보유 — 다주택은 1세대1주택 기본공제 대상이 아니므로 「아니오」로 고정됩니다.',
+            '다주택의 개편안 기본공제는 아래 「거주비중」으로 계산합니다 (4억원 + 5억원 × 거주비중).']
+          : ['개편안 1세대1주택 기본공제 판정 기준입니다.',
+            '거주 14억원 / 비거주 9억원 — 1주택이라도 거주하지 않으면 9억원으로 줄어듭니다.']),
+      },
+      { k: 'liveYears', label: '거주기간', unit: '년', adv: true, hint: '개편안 세액공제는 보유기간이 아니라 거주기간 기준' },
+      {
+        // 개편안 다주택 기본공제의 거주비중. 비중을 직접 받는 대신 거주주택 공시가격을 받고
+        // 위 「주택 공시가격 합계」로 나눠 자동 산출한다 — 상담 현장에서 비중을 손으로 계산하지 않게.
+        k: 'residentPub', label: '거주주택 공시가격', unit: '만원', adv: true,
+        hint: (g) => (g.num('houses') <= 1
+          ? ['1주택은 거주비중을 쓰지 않습니다 — 위 「해당 주택 거주」로 판정합니다 (14억원 / 9억원).']
+          : [
+            '보유 주택 중 실제 거주하는 주택의 공시가격입니다.',
+            '개편안 다주택 기본공제 = 4억원 + 5억원 × 거주비중 (거주주택 공시가격 ÷ 주택 공시가격 합계)',
+            '비워두면 거주비중 0%로 보아 기본공제 4억원만 적용합니다.',
+          ]),
+      },
+      {
+        k: 'residentRatioShown', label: '거주비중 (자동)', type: 'readonly', unit: '%', adv: true,
+        value: (g) => (g.won('pub') > 0
+          ? (Math.min(1, g.won('residentPub') / g.won('pub')) * 100).toFixed(1) : ''),
+        hint: (g) => {
+          const pub = g.won('pub');
+          const res = g.won('residentPub');
+          if (pub === 0) return ['주택 공시가격 합계를 먼저 입력하세요.'];
+          if (res > pub) {
+            return ['거주주택 공시가격이 합계를 넘습니다 — 비중을 100%로 봅니다. 두 값을 확인해 주세요.'];
+          }
+          return ['거주주택 ' + W(res) + ' ÷ 합계 ' + W(pub)];
+        },
+      },
+      { k: 'adjusted', label: '조정대상지역', type: 'choice', opts: ['아니오', '예'], def: '아니오', adv: true, hint: '개편안 2028년 공정시장가액비율 80% 판정' },
+    ],
+    run(g) {
+      // 1세대1주택 여부는 주택 수에서 결정된다 (선택값을 받지 않는다).
+      const single = g.num('houses') <= 1;
+      const base = {
+        publicPrice: g.won('pub'), numHouses: g.num('houses'), isSingleHouse: single,
+        ownerAge: g.num('ownerAge'), holdingYears: g.num('hold'), propertyTaxPaid: g.won('ptax'),
+        // 거주 판정은 1세대1주택 기본공제에만 쓰이므로 다주택이면 성립하지 않는다.
+        isResident: single && g.pick('resident') === '예',
+        // 거주비중은 거주주택 공시가격 ÷ 주택 공시가격 합계로 산출한다 (100%를 넘지 않게 절단).
+        residentRatio: g.won('pub') > 0
+          ? Math.min(1, g.won('residentPub') / g.won('pub')) * 100 : 0,
+        livingYears: g.num('liveYears'), isAdjustedArea: g.pick('adjusted') === '예',
+      };
+      // 주 결과는 현행 기준이다.
+      const r = calculateComprehensiveRealEstateTax(base);
+      const steps = [
+        ['주택 공시가격 합계', W(r.publicPrice), ''],
+        [single ? '1세대1주택 기본공제' : '기본공제', '− ' + W(r.basicDeduction), single ? '12억원' : '9억원'],
+        ['과세표준', W(r.taxBase), '(공시가격 − 공제) × 공정시장가액비율 ' + PCT(r.fairMarketRatio)],
+        ['종부세 산출세액', W(r.grossTax), r.isMultiHouse ? '3주택 이상 중과 0.5~5.0%' : '2주택 이하 0.5~2.7%'],
+      ];
+      if (r.creditAmount > 0) {
+        steps.push(['고령자·장기보유 세액공제', '− ' + W(r.creditAmount),
+          '고령자 ' + PCT(r.ageCreditRate) + ' + 보유 ' + PCT(r.holdingCreditRate) + ', 합계 한도 80%']);
+      }
+      if (r.propertyTaxPaid > 0) steps.push(['재산세 중복분 공제', '− ' + W(r.propertyTaxPaid), '']);
+      steps.push(['농어촌특별세', W(r.ruralTax), '종부세액 × 20%']);
+
+      // 2026 개편안 적용 시의 연도별 세액을 함께 보여준다 (참고용 병기).
+      const compare = [];
+      const notes = [];
+      if (r.taxBase > 0 || r.publicPrice > 0) {
+        [BASIS_YEAR_2027, BASIS_YEAR_2028].forEach((year) => {
+          const x = calculateComprehensiveRealEstateTax(
+            Object.assign({}, base, { basis: BASIS_REFORM_2026, basisYear: year }));
+          const diff = x.finalTax - r.finalTax;
+          compare.push({
+            label: year + '년 (개편안 적용)',
+            value: W(x.finalTax),
+            note: '기본공제 ' + W(x.basicDeduction)
+              + (single ? '' : ' (4억원 + 5억원 × 거주비중 ' + PCT(base.residentRatio / 100) + ')')
+              + ' · 공정시장가액비율 ' + PCT(x.fairMarketRatio)
+              + ' · 과세표준 ' + W(x.taxBase)
+              + (x.creditAmount > 0
+                ? ' · 거주기간 세액공제 ' + W(x.creditAmount) + (x.isCreditCapped ? ' (한도 ' + W(x.creditAmountCap) + ' 적용)' : '')
+                : '')
+              + ' → 현행 대비 ' + (diff === 0 ? '동일' : (diff > 0 ? '+' : '−') + W(Math.abs(diff))),
+          });
+        });
+        notes.push('아래 개편안 세액은 입법 확정 전 기준입니다. 주 결과(위 큰 금액)는 현행 기준입니다.');
+        notes.push('개편안은 세율체계를 주택수 기준에서 가액 기준으로 일원화하지만, 그 세율표 수치가 첨부 자료에 없어 현행 세율표를 적용했습니다.');
+        notes.push('세액공제의 거주기간 구간별 공제율이 첨부 자료에 없어 현행 보유기간 공제율표(5년 20% / 10년 40% / 15년 50%)를 거주기간에 준용했습니다.');
+        notes.push('세부담상한 150%→200% 전환은 전년도 세액 정보가 필요해 반영하지 않았습니다.');
+      }
+      return {
+        total: r.finalTax, label: '예상 종합부동산세 (현행 기준)',
+        sub: '과세표준 ' + W(r.taxBase),
+        steps: steps, compare: compare, notes: notes,
+      };
+    },
+  },
+  {
+    key: 'transfer', name: '양도소득세', desc: '장기보유특별공제 · 다주택 중과',
+    fields: [
+      { k: 'sale', label: '양도가액', unit: '만원', sec: '양도 내역' },
+      { k: 'buy', label: '취득가액', unit: '만원' },
+      { k: 'years', label: '보유기간', unit: '년', def: 10 },
+      {
+        k: 'exempt', label: '1세대 1주택 비과세', type: 'choice', opts: ['아니오', '예'], def: '아니오',
+        hint: (g) => {
+          const sale = g.won('sale');
+          const limit = ONE_HOUSE_EXEMPT_LIMIT;
+          const lines = [
+            W(limit) + ' 초과 판정은 양도가액 기준입니다 (고가주택 · 소득세법 제89조 제1항 제3호).',
+            '과세대상 양도차익 = 양도차익 × (양도가액 − ' + W(limit) + ') ÷ 양도가액 (시행령 제160조 제1항)',
+            '양도가액에서 ' + W(limit) + '을 뺀 금액이 과세표준이 되는 것이 아닙니다.',
+          ];
+          if (sale > limit) {
+            lines.push('현재 양도가액 ' + W(sale) + ' → 양도차익의 '
+              + PCT((sale - limit) / sale) + '만 과세대상입니다.');
+          } else if (sale > 0) {
+            lines.push('현재 양도가액 ' + W(sale) + ' → ' + W(limit) + ' 이하이므로 전액 비과세입니다.');
+          }
+          return lines;
+        },
+      },
+      {
+        k: 'live', label: '거주기간', unit: '년',
+        hint: (g) => (g.pick('exempt') === '예'
+          ? ['표2 장기보유특별공제에 반영됩니다 — 보유 4%/년 + 거주 4%/년, 한도 80%',
+             '10년 이상 거주하고 양도가액이 30억원 이하면 개편안 기본공제 2,500만원 대상입니다.']
+          : ['1세대1주택 비과세일 때만 사용됩니다.',
+             '현재는 표1(보유 2%/년, 한도 30%)이 적용되어 거주기간이 반영되지 않습니다.']),
+      },
+      { k: 'cost', label: '필요경비', unit: '만원', adv: true, sec: '세부 옵션' },
+      {
+        k: 'surcharge', label: '다주택 중과', type: 'choice',
+        opts: TRANSFER_SURCHARGE_OPTIONS.map((o) => o.label),
+        def: TRANSFER_SURCHARGE_OPTIONS[0].label, adv: true,
+        // 비과세 선택과 짝이 맞는 선택지만 열어 둔다.
+        //   비과세 예   → 비과세 전용 「없음」만 (중과는 1주택 전제와 양립 불가)
+        //   비과세 아니오 → 비과세 전용 「없음」을 닫는다
+        disabledOpts: (g) => {
+          const exempt = g.pick('exempt') === '예';
+          return TRANSFER_SURCHARGE_OPTIONS
+            .filter((o) => (exempt ? !o.requiresExempt : o.requiresExempt))
+            .map((o) => o.label);
+        },
+        hint: (g) => (g.pick('exempt') === '예'
+          ? ['1세대1주택 비과세를 선택했으므로 다주택 중과는 적용되지 않습니다.']
+          : ['비과세가 아니므로 「없음 — 1세대1주택 비과세」는 선택할 수 없습니다.',
+            '중과는 조정대상지역 소재 다주택에만 적용됩니다 (소득세법 제104조 제7항).',
+            '비조정대상지역 다주택이거나 1주택이지만 보유 2년 미만 등으로 과세되는 경우에는 「없음 — 중과 대상 아님」을 고르세요.']),
+      },
+      // 결과는 항상 현행 기준으로 내고 개편안은 하단에 연도별로 병기하므로
+      // '적용 기준'·'기준연도' 선택은 두지 않는다 (종부세와 동일한 방침).
+    ],
+    run(g) {
+      const exempt = g.pick('exempt') === '예';
+      const holdYears = g.num('years');
+      const liveYears = g.num('live');
+      const base = {
+        salePrice: g.won('sale'), purchasePrice: g.won('buy'), expenses: g.won('cost'),
+        holdingYears: holdYears, livingYears: liveYears, isOneHouseExempt: exempt,
+        surchargeHouses: TRANSFER_SURCHARGE_OPTIONS.find((o) => o.label === pickValid(g, 'surcharge')).houses,
+      };
+      // 주 결과는 현행 기준이다.
+      const r = calculateTransferIncomeTax(base);
+
+      // 장기보유특별공제 산식을 연수와 함께 보여준다.
+      const ltNote = (x) => {
+        const capped = Math.min(liveYears, holdYears);
+        if (x.usesResidenceOnlyRate) {
+          return '개편안 거주기간 단일공제 — 거주 ' + capped + '년 × 8% → ' + PCT(x.longTermRate);
+        }
+        if (exempt) {
+          return '표2 — 보유 ' + holdYears + '년 × 4% + 거주 ' + capped + '년 × 4% → ' + PCT(x.longTermRate)
+            + (liveYears > holdYears ? ' (거주기간은 보유기간을 넘지 못함)' : '');
+        }
+        return '표1 — 보유 ' + holdYears + '년 × 2% → ' + PCT(x.longTermRate) + ' (한도 30%)';
+      };
+
+      const steps = [
+        ['양도차익', W(r.transferGain),
+          '양도가 ' + W(g.won('sale')) + ' − 취득가 ' + W(g.won('buy'))
+          + (g.won('cost') > 0 ? ' − 필요경비 ' + W(g.won('cost')) : '')],
+      ];
+      if (exempt) {
+        steps.push(['1세대1주택 비과세 — 과세 안분비율', PCT(r.exemptRatio),
+          '(양도가 ' + W(g.won('sale')) + ' − ' + W(ONE_HOUSE_EXEMPT_LIMIT) + ') ÷ 양도가 '
+          + W(g.won('sale')) + ' · 시행령 제160조 제1항']);
+        steps.push(['과세대상 양도차익', W(r.taxableGain),
+          '양도차익 ' + W(r.transferGain) + ' × ' + PCT(r.exemptRatio)
+          + ' — 양도가액에서 ' + W(ONE_HOUSE_EXEMPT_LIMIT) + '을 뺀 금액이 아닙니다']);
+      }
+      if (r.longTermRate > 0) {
+        steps.push(['장기보유특별공제', '− ' + W(r.longTermDeduction), ltNote(r)]);
+      } else if (holdYears < 3) {
+        steps.push(['장기보유특별공제', '− 0만원', '보유 ' + holdYears + '년 — 3년 미만은 공제 대상이 아님']);
+      }
+      steps.push(['기본공제', '− ' + W(r.basicDeduction),
+        r.hasLongResidenceDeduction ? '개편안 장기거주 1주택 — 거주 10년 이상·양도가 30억원 이하' : '']);
+      steps.push(['양도소득 과세표준', W(r.taxBase), '']);
+      steps.push(['산출세액', W(r.calculatedTax),
+        '기본 6~45% 누진'
+        + (r.surchargeRate > 0 ? ' + 중과 ' + PCT(r.surchargeRate) + 'p' : '')
+        + (r.surchargeSuppressed ? ' · 1세대1주택 비과세와 양립하지 않아 다주택 중과을 배제함' : '')]);
+      steps.push(['지방소득세', W(r.localTax), '산출세액 × 10%']);
+
+      // 2026 개편안 적용 시의 연도별 세액을 함께 보여준다 (참고용 병기).
+      const compare = [];
+      const notes = [];
+      let anyRateFromCurrent = false;
+      if (g.won('sale') > 0) {
+        [BASIS_YEAR_2027, BASIS_YEAR_2028, BASIS_YEAR_2029].forEach((year) => {
+          const x = calculateTransferIncomeTax(
+            Object.assign({}, base, { basis: BASIS_REFORM_2026, basisYear: year }));
+          if (x.longTermRateFromCurrent) anyRateFromCurrent = true;
+          const diff = x.finalTax - r.finalTax;
+          const bits = [ltNote(x) + ' → 공제 ' + W(x.longTermDeduction)
+            + (x.isLongTermCapped ? ' (한도 ' + W(x.longTermCap) + ' 적용)' : '')];
+          if (x.surchargeRate > 0) bits.push('중과 ' + PCT(x.surchargeRate) + 'p');
+          if (x.hasLongResidenceDeduction) bits.push('기본공제 ' + W(x.basicDeduction));
+          bits.push('과세표준 ' + W(x.taxBase));
+          bits.push('현행 대비 ' + (diff === 0 ? '동일' : (diff > 0 ? '+' : '−') + W(Math.abs(diff))));
+          compare.push({ label: year + '년 (개편안 적용)', value: W(x.finalTax), note: bits.join(' · ') });
+        });
+        notes.push('아래 개편안 세액은 입법 확정 전 기준입니다. 주 결과(위 큰 금액)는 현행 기준입니다.');
+        if (anyRateFromCurrent) {
+          notes.push('장기보유특별공제의 2027·2028년 단계별 전환율은 첨부 개편안 자료에 수치가 없어 현행 표2 공제율을 적용했습니다. 2029년만 거주기간 단일공제(최대 80%)를 적용했습니다.');
+        }
+        notes.push('다주택 중과 한시완화는 2027·2028년만 적용되며, 2029년은 완화가 끝나 현행 중과율로 돌아갑니다.');
+      }
+      return {
+        total: r.finalTax, label: '예상 양도소득세 (현행 기준)',
+        sub: '과세표준 ' + W(r.taxBase),
+        steps: steps, compare: compare, notes: notes,
+      };
+    },
+  },
+  {
+    key: 'stock', name: '비상장주식 평가', desc: '순손익·순자산가치 가중평균',
+    fields: [
+      {
+        k: 'netAsset', label: '순자산가액', unit: '만원', sec: '평가 기초',
+        hint: '상증법에 따라 평가한 자산총계에서 부채총계를 뺀 금액입니다.',
+      },
+      {
+        k: 'inc1', label: '순손익액 — 1년 전', unit: '만원', sec: '최근 3년 순손익액',
+        hint: [
+          '상증법 시행령 제56조 — 가중평균 = (1년 전 × 3 + 2년 전 × 2 + 3년 전 × 1) ÷ 6',
+          '결손인 연도는 0으로 입력하세요. 음수는 입력할 수 없습니다.',
+        ],
+      },
+      { k: 'inc2', label: '순손익액 — 2년 전', unit: '만원' },
+      { k: 'inc3', label: '순손익액 — 3년 전', unit: '만원' },
+      {
+        k: 'weighted', label: '가중평균 순손익액', type: 'readonly', unit: '만원',
+        value: (g) => N(Math.round(weightedIncomeOf(g) / MANWON)),
+      },
+      {
+        k: 'shares', label: '발행주식 총수', unit: '주', def: 10000, sec: '주식 현황',
+        hint: [
+          '이 세목은 법인 주식의 1주당 평가액을 정하는 것이 목적이므로 발행주식 전체를 평가합니다.',
+          '개인별 보유분 가액은 아래 1주당 평가액 × 보유주식수로 계산해 상속세·증여세 항목에 넣으세요.',
+        ],
+      },
+      {
+        k: 'netOnly', label: '순자산가치만 평가', type: 'choice', opts: ['아니오', '예'], def: '아니오',
+        adv: true, sec: '세부 옵션',
+        hint: [
+          '상증법 시행령 제54조 제4항 — 사업개시 3년 미만, 휴·폐업, 청산 중, 자산총액 중 부동산등 비율 80% 이상인 법인이 대상입니다.',
+          '「예」를 선택하면 순손익가치와 80% 하한을 쓰지 않고 순자산가치만으로 평가합니다.',
+        ],
+      },
+      {
+        k: 'realty', label: '부동산 과다보유 법인', type: 'choice', opts: ['아니오', '예'], def: '아니오', adv: true,
+        hint: [
+          '자산총액 중 부동산등 비율이 50% 이상인 법인입니다.',
+          '가중치가 순손익 2 : 순자산 3으로 역전됩니다.',
+        ],
+      },
+      {
+        k: 'premium', label: '최대주주 할증', type: 'choice', opts: ['없음', '20% 할증'], def: '20% 할증', adv: true,
+        hint: [
+          '상증법 제63조 제3항 — 최대주주와 그 특수관계인이 보유한 주식은 20%를 가산합니다.',
+          '중소기업 주식은 할증 대상이 아니므로 「없음」을 선택하세요.',
+        ],
+      },
+    ],
+    run(g) {
+      const realty = g.pick('realty') === '예';
+      const netOnly = g.pick('netOnly') === '예';
+      const weightedIncome = weightedIncomeOf(g);
+      const r = calculateUnlistedStockValue({
+        netAsset: g.won('netAsset'), weightedIncome: weightedIncome, totalShares: g.num('shares'),
+        isRealtyHeavy: realty, netAssetOnly: netOnly,
+        hasMaxShareholderPremium: g.pick('premium') === '20% 할증',
+      });
+      const steps = [
+        ['가중평균 순손익액', W(weightedIncome), '(1년 전 × 3 + 2년 전 × 2 + 3년 전 × 1) ÷ 6'],
+        ['1주당 순자산가치', E(r.netAssetPerShare), '순자산가액 ÷ 발행주식수'],
+      ];
+      if (netOnly) {
+        steps.push(['1주당 평가액', E(r.valuePerShare), '순자산가치 단독평가 — 가중평균·80% 하한 미적용']);
+      } else {
+        steps.push(['1주당 순손익가치', E(r.incomePerShare), '가중평균 순손익액 ÷ 주식수 ÷ 10%']);
+        steps.push(['가중평균', E(r.weightedValue), realty ? '부동산 과다법인 — 순손익 2 : 순자산 3' : '순손익 3 : 순자산 2']);
+        steps.push(['순자산가치 80% 하한', E(r.floorValue), r.isFloorApplied ? '하한이 적용됨' : '하한 미달 없음']);
+      }
+      if (r.premiumRate > 1) steps.push(['최대주주 할증', '× ' + r.premiumRate, '20% 할증 적용']);
+      steps.push(['1주당 평가액 (최종)', E(r.pricePerShare), '']);
+      steps.push(['발행주식 ' + N(r.totalShares) + '주 전체 평가액', W(r.totalValue),
+        '법인 주식 총가액 · 개인별 보유분은 1주당 ' + E(r.pricePerShare) + ' × 보유주식수']);
+
+      const notes = [];
+      if (netOnly) notes.push('순자산가치 단독평가를 선택했으므로 최근 3년 순손익액은 평가액에 반영되지 않습니다.');
+      if (!netOnly && [g.num('inc1'), g.num('inc2'), g.num('inc3')].some((v) => v === 0)) {
+        notes.push('순손익액이 0인 연도가 있습니다. 실제로 결손인 해라면 결손금만큼의 순손익가치 하락이 반영되지 않으므로 평가액이 높게 나옵니다. 순자산가치 단독평가 요건을 함께 검토하세요.');
+      }
+      return {
+        total: r.totalValue, label: '비상장주식 평가액', sub: '1주당 ' + E(r.pricePerShare),
+        steps: steps, notes: notes,
+      };
+    },
+  },
+  {
+    key: 'paydiv', name: '급여 및 배당', desc: '배당 실행 여부 · 급여 수준별 세부담 비교',
+    fields: [
+      {
+        k: 'salary', label: '현재 급여액 (연간)', unit: '만원', sec: '소득 현황',
+        hint: '비과세를 뺀 연간 총급여액입니다.',
+      },
+      {
+        k: 'dividend', label: '예상 배당액 (연간)', unit: '만원',
+        hint: [
+          '법인세를 이미 부담한 이익잉여금에서 실제로 지급할 배당금액입니다.',
+          '연간 금융소득 2,000만원까지는 15.4% 분리과세로 끝나고, 초과분은 급여와 합산해 누진과세됩니다.',
+        ],
+      },
+      {
+        k: 'step', label: '급여 증감 비교 폭', unit: '%', def: 10, simple: 10, adv: true, sec: '세부 옵션',
+        hint: [
+          '아래 「급여 수준별 세부담」 표의 단계 폭입니다.',
+          '10%를 넣으면 현재 급여의 −20 / −10 / 현재 / +10 / +20% 다섯 단계를 비교합니다.',
+        ],
+      },
+      {
+        k: 'insur', label: '4대보험 반영', type: 'choice', opts: ['예', '아니오'], def: '예', adv: true,
+        hint: [
+          '급여액의 약 9%를 근로자 부담분으로 가산합니다 (국민연금 4.5 + 건강보험 3.545 + 장기요양 약 0.46 + 고용보험 0.9%).',
+          '국민연금 기준소득월액 상한은 반영하지 않아 고소득 구간에서는 다소 크게 나옵니다.',
+        ],
+      },
+    ],
+    run(g) {
+      const withInsurance = g.pick('insur') === '예';
+      const r = calculateSalaryDividendCompare({
+        salary: g.won('salary'), dividend: g.won('dividend'),
+        includeInsurance: withInsurance, stepPercent: g.num('step'),
+      });
+      const on = r.withDividend;
+
+      const steps = [
+        ['총급여액', W(on.salary), '연간 급여 (비과세 제외)'],
+        ['근로소득공제', '− ' + W(on.earnedDeduction), '소득세법 제47조 · 한도 2,000만원'],
+        ['근로소득 과세표준', W(on.taxBase), '근로소득금액 − 본인 기본공제 150만원'],
+        ['산출세액', W(on.computedTax), '누진세율 6~45%'],
+        ['근로소득세액공제', '− ' + W(on.earnedCredit), '소득세법 제59조 · 총급여 구간별 한도'],
+        ['근로소득세', W(on.salaryTax), '지방소득세 10% 포함'],
+      ];
+      if (on.insurance > 0) steps.push(['4대보험 (근로자 부담)', W(on.insurance), '급여 × 약 9%']);
+      if (on.dividend > 0) {
+        steps.push(['배당소득세 — ' + W(SEPARATE_TAXATION_LIMIT) + ' 이하분', W(on.dividendSeparateTax),
+          W(Math.min(on.dividend, SEPARATE_TAXATION_LIMIT)) + ' × 15.4% 원천징수 종결']);
+        if (on.dividendExcess > 0) {
+          steps.push(['배당소득세 — 초과분', W(on.dividendExcessTax),
+            '초과 ' + W(on.dividendExcess) + '을 급여 과세표준에 합산한 증분'
+            + (on.isComparativeFloor ? ' · 비교과세 하한 15.4% 적용' : '')]);
+        }
+      }
+      steps.push(['총 세부담', W(on.totalTax), on.dividend > 0 ? '근로소득세 + 배당소득세' : '근로소득세']);
+      steps.push(['세후 수령액', W(on.netCash),
+        '급여 + 배당 − 세금' + (on.insurance > 0 ? ' − 4대보험' : '')
+        + ' · 실효부담률 ' + (on.effectiveRate * 100).toFixed(1) + '%']);
+
+      // ── 표1 — 급여를 고정한 채 배당 실행 여부만 바꾼다 ──
+      const cols1 = ['구분', '급여', '배당', '근로소득세', '배당소득세'];
+      if (withInsurance) cols1.push('4대보험');
+      cols1.push('총 부담', '세후 수령액');
+      const row1 = (name, x, cls) => {
+        const cells = [name, W(x.salary), x.dividend > 0 ? W(x.dividend) : '−', W(x.salaryTax),
+          x.dividendTax > 0 ? W(x.dividendTax) : '−'];
+        if (withInsurance) cells.push(W(x.insurance));
+        cells.push(W(x.burden), W(x.netCash));
+        return { cells: cells, on: cls === 'on', sum: cls === 'sum' };
+      };
+      const diffCells = ['차이', '동일', '+' + W(r.dividend), '동일',
+        '+' + W(on.dividendTax - r.withoutDividend.dividendTax)];
+      if (withInsurance) diffCells.push('동일');
+      diffCells.push('+' + W(r.dividendCost), '+' + W(on.netCash - r.withoutDividend.netCash));
+
+      // ── 표2 — 배당액을 고정한 채 급여 수준만 바꾼다 ──
+      const cols2 = ['급여', '근로소득세'];
+      if (r.dividend > 0) cols2.push('배당소득세');
+      if (withInsurance) cols2.push('4대보험');
+      cols2.push('총 부담', '세후 수령액', '실효부담률');
+
+      const tables = [
+        {
+          label: '배당 실행 여부 비교 (급여 고정)',
+          head: cols1,
+          rows: [
+            row1('배당 없음', r.withoutDividend),
+            row1('배당 실행', on, 'on'),
+            { cells: diffCells, sum: true },
+          ],
+          note: r.dividend === 0
+            ? '예상 배당액을 입력하면 배당 실행 시의 추가 세부담이 표시됩니다.'
+            : '배당 ' + W(r.dividend) + '을 실행하면 세부담이 ' + W(r.dividendCost)
+              + ' 늘고, 세후 수령액은 ' + W(on.netCash - r.withoutDividend.netCash) + ' 늘어납니다.',
+        },
+        {
+          label: '급여 수준별 세부담 (배당 고정)',
+          head: cols2,
+          rows: r.salaryScale.map((x) => {
+            const cells = [W(x.salary) + (x.isCurrent ? ' (현재)' : ''), W(x.salaryTax)];
+            if (r.dividend > 0) cells.push(W(x.dividendTax));
+            if (withInsurance) cells.push(W(x.insurance));
+            cells.push(W(x.burden), W(x.netCash), (x.effectiveRate * 100).toFixed(1) + '%');
+            return { cells: cells, on: x.isCurrent };
+          }),
+          note: '배당액 ' + (r.dividend > 0 ? W(r.dividend) : '0원') + '을 고정하고 급여만 '
+            + r.stepPercent + '% 단위로 증감시킨 결과입니다.'
+            + (r.dividend > 0 ? ' 급여가 오르면 배당 초과분의 한계세율도 함께 올라 배당소득세가 늘어납니다.' : ''),
+        },
+      ];
+
+      const notes = [
+        '근로소득공제(소득세법 제47조)·본인 기본공제 150만원·근로소득세액공제(제59조)만 반영했습니다. 부양가족 인적공제, 연금·보험료 공제, 특별세액공제는 반영하지 않아 실제 세액보다 크게 나옵니다.',
+        '배당액은 법인세를 이미 부담한 이익잉여금에서 지급되는 것으로 보아 법인 단계의 세금은 계산하지 않았습니다. 배당 재원을 만드는 단계에서는 법인세법 제55조에 따라 과세표준 구간별로 '
+          + CORPORATE_TAX_RATE_OPTIONS.map((o) => o.label).join(' / ') + '가 이미 부담됩니다 ('
+          + CORPORATE_TAX_RATE_APPLIED_FROM + ' 기준).',
+        '배당가산(Gross-up)과 배당세액공제, 소득세법 제62조의 비교과세 정밀계산은 생략했습니다. 2,000만원 초과분에 누진세율을 적용하고 원천징수세율(15.4%)을 하한으로 두는 방식으로 개산했습니다.',
+      ];
+      if (withInsurance) {
+        notes.push('4대보험 근로자 부담분은 국민연금 기준소득월액 상한을 반영하지 않은 정률(약 9%) 근사치이며, 보험료의 소득공제·세액공제 효과도 반영하지 않았습니다.');
+      }
+
+      return {
+        total: on.totalTax,
+        label: on.dividend > 0 ? '총 세부담 (급여 + 배당)' : '총 세부담 (급여)',
+        sub: '급여 ' + W(on.salary) + (on.dividend > 0 ? ' · 배당 ' + W(on.dividend) : '')
+          + ' · 세후 ' + W(on.netCash),
+        steps: steps, tables: tables, notes: notes,
+      };
+    },
+  },
+  {
+    key: 'retire', name: '임원퇴직금', desc: '지급배수 한도 · 퇴직소득세 개산',
+    fields: [
+      {
+        k: 'avgPay', label: '최종 3년 연평균 급여', unit: '만원', sec: '지급 기초',
+        hint: [
+          '퇴직일부터 소급 3년간 총급여의 연평균환산액입니다 (소득세법 제22조 제3항).',
+          '2020년 이후 근속분의 2배수 한도와 정관상 지급액이 이 급여로 계산됩니다.',
+        ],
+      },
+      {
+        // 소득세법 제22조 제3항은 구간별로 기준급여가 다르다.
+        // 3배 구간(2012~2019년)의 한도는 최종 급여가 아니라 2019.12.31. 기준 3년 평균급여로 계산한다.
+        k: 'avgPay2019', label: '2019.12.31. 기준 3년 평균급여', unit: '만원', adv: true,
+        hint: (g) => {
+          const s = serviceSpans();
+          if (s.years2012to2019 === 0) {
+            return ['2012~2019년 근속분이 없어 이 값은 세액에 영향을 주지 않습니다.'];
+          }
+          return [
+            '2017~2019년 총급여의 연평균환산액입니다 (2019.12.31.부터 소급 3년).',
+            '3배수 한도(2012~2019년 근속 ' + s.years2012to2019 + '년)는 최종 급여가 아니라 이 급여로 계산됩니다.',
+            '비워두면 위 최종 3년 평균급여를 그대로 씁니다 — 급여가 그동안 올랐다면 한도가 실제보다 크게 잡힙니다.',
+          ];
+        },
+      },
+      {
+        k: 'joinDate', label: '입사일', type: 'date', derive: formatDate, sec: '근속기간',
+        hint: '숫자 8자리로 입력하세요. 예: 20100301',
+      },
+      { k: 'retireDate', label: '퇴직(예정)일', type: 'date', derive: formatDate },
+      {
+        k: 'years', label: '근속연수', type: 'readonly', unit: '년',
+        value: () => (serviceSpans().serviceYears || ''),
+        hint: () => {
+          const s = serviceSpans();
+          if (s.serviceYears === 0) {
+            return ['입사일과 퇴직일을 넣으면 근속연수와 구간별 지급배수 한도가 자동으로 산정됩니다.'];
+          }
+          return [
+            '근속 ' + s.months + '개월 — 소득세법 제48조에 따라 1년 미만의 기간은 1년으로 봅니다.',
+            '2011년 이전 ' + s.yearsUntil2011 + '년 (한도 없음) · 2012~2019년 '
+              + s.years2012to2019 + '년 (3배수) · 2020년 이후 ' + s.yearsAfter2020 + '년 (2배수)',
+          ];
+        },
+      },
+      {
+        k: 'mult', label: '정관상 지급배수', unit: '배', def: 2, sec: '지급 기준',
+        hint: [
+          '정관 또는 임원퇴직금 지급규정에 정한 배수입니다.',
+          '2020년 이후 근속분의 한도가 2배수이므로 기본값을 2배로 둡니다.',
+          '정관이 3배로 정해져 있으면 3을 넣으세요 — 한도 초과분은 근로소득으로 과세되고 법인 손금도 부인될 수 있습니다.',
+        ],
+      },
+      {
+        k: 'otherInc', label: '퇴직 연도의 다른 근로소득', unit: '만원', adv: true, sec: '세부 옵션',
+        hint: [
+          '한도 초과분이 있을 때만 세액에 영향을 줍니다.',
+          '초과분이 이 소득에 합산되어 적용 한계세율이 결정됩니다.',
+        ],
+      },
+    ],
+    ready(g) {
+      if (!(g.num('avgPay') > 0)) return { ok: false, label: '최종 3년 연평균 급여를 입력하세요' };
+      if (serviceSpans().serviceYears === 0) return { ok: false, label: '입사일과 퇴직일을 입력하세요' };
+      return { ok: true, label: '결과 보기' };
+    },
+    run(g) {
+      const s = serviceSpans();
+      const r = calculateExecutiveSeveranceTax({
+        averagePay: g.won('avgPay'), averagePay2019: g.won('avgPay2019'),
+        serviceYears: s.serviceYears, payMultiple: g.num('mult'),
+        yearsUntil2011: s.yearsUntil2011, years2012to2019: s.years2012to2019,
+        otherIncome: g.won('otherInc'),
+      });
+      // 구간별 배수 설명을 실제로 산입된 연수와 기준급여로 만든다.
+      const spans = [];
+      if (r.yearsPre > 0) spans.push('2011년 이전 ' + r.yearsPre + '년 한도 없음');
+      if (r.yearsTriple > 0) {
+        spans.push('2012~2019년 ' + r.yearsTriple + '년 × 3배 = ' + W(r.limitTriple)
+          + ' (기준급여 ' + W(r.annualBase2019 * 10) + (r.usesSeparate2019Pay ? '' : ' · 최종급여로 갈음') + ')');
+      }
+      if (r.yearsDouble > 0) {
+        spans.push('2020년 이후 ' + r.yearsDouble + '년 × 2배 = ' + W(r.limitDouble)
+          + ' (기준급여 ' + W(r.annualBase * 10) + ')');
+      }
+      const steps = [
+        ['근속연수', s.serviceYears + '년',
+          formatDate(state.vals.joinDate) + ' ~ ' + formatDate(state.vals.retireDate)
+          + ' (' + s.months + '개월) · 1년 미만은 1년으로 봄'],
+        ['정관상 지급액', W(r.paidAmount),
+          '연평균급여 ÷ 10 × 근속 ' + s.serviceYears + '년 × ' + g.num('mult') + '배'],
+        ['퇴직소득 인정 한도', W(r.limitAmount), spans.join(' · ')],
+        ['한도 초과분 (근로소득)', W(r.excess),
+          r.excess > 0 ? '근로소득으로 과세 — 손비 부인 위험' : '초과 없음'],
+        ['근속연수공제', '− ' + W(r.yearsDeduction), ''],
+        ['환산급여', W(r.convertedIncome), '(퇴직소득 − 근속공제) ÷ 근속연수 × 12'],
+        ['퇴직소득세', W(r.severanceTax), '환산급여공제 후 누진세율 → 연분연승 · 지방소득세 포함'],
+      ];
+      if (r.excess > 0) {
+        steps.push(['초과분 근로소득세', W(r.excessTax),
+          '근로소득공제·근로소득세액공제 재계산 후의 증분'
+          + (g.won('otherInc') > 0 ? ' · 다른 근로소득 ' + W(g.won('otherInc')) + ' 합산' : '')
+          + ' · 지방소득세 포함']);
+      }
+      steps.push(['총 세부담', W(r.totalTax), '퇴직소득세 + 초과분 근로소득세']);
+
+      const notes = [];
+      if (s.yearsUntil2011 + s.years2012to2019 + s.yearsAfter2020 > 0) {
+        notes.push('구간별 근속연수는 입사일·퇴직일 사이의 월수를 12로 나눠 반올림해 배분하고, 남는 기간을 2020년 이후 구간으로 보았습니다. 실제 신고에서는 월수 기준으로 안분합니다.');
+      }
+      if (r.excess > 0 && g.won('otherInc') === 0) {
+        notes.push('한도 초과분이 있는데 퇴직 연도의 다른 근로소득을 넣지 않았습니다. 같은 해 급여가 있으면 초과분의 한계세율이 올라 세액이 커지므로 심화 모드에서 입력해 주세요.');
+      }
+      if (r.yearsTriple > 0 && !r.usesSeparate2019Pay) {
+        notes.push('2012~2019년 근속분의 3배수 한도는 2019.12.31. 기준 3년 평균급여로 계산해야 하는데(소득세법 제22조 제3항), 그 값을 넣지 않아 최종 3년 평균급여로 갈음했습니다. 그동안 급여가 올랐다면 한도가 실제보다 크게 잡혀 한도초과분이 과소 계상됩니다 — 심화 모드에서 입력해 주세요.');
+      }
+      return {
+        // paidAmount 는 정관 배수로 지급하는 총액(세전)이다.
+        // '수령액'이라고 쓰면 같은 화면의 급여·배당 항목이 쓰는 '세후 수령액'과 뜻이 어긋난다.
+        total: r.totalTax, label: '예상 세부담', sub: '세전 지급액 ' + W(r.paidAmount),
+        steps: steps, notes: notes,
+      };
+    },
+  },
+  {
+    key: 'succession', name: '가업승계제도 검토', desc: '가업상속공제 · 증여세 과세특례',
+    fields: [
+      {
+        k: 'biz', label: '법인 주식 검토 가액', unit: '만원', sec: '가업 현황',
+        hint: [
+          '승계를 검토하는 지분의 평가액입니다 — 법인 전체 주식가액이 아니라 실제로 넘길 지분만 넣으세요.',
+          '「비상장주식 평가」 항목의 1주당 평가액 × 승계 대상 주식수로 계산합니다.',
+          '이 항목은 법인 지분만 검토합니다. 부동산·금융자산 등 개인 재산은 상속세·증여세 항목에서 보세요.',
+        ],
+      },
+      {
+        k: 'unrelated', label: '사업무관자산 비율', unit: '%',
+        hint: [
+          '상증법 시행령 제15조 제5항 — 공제대상 = 검토 가액 × (1 − 사업무관자산가액 ÷ 총자산가액)',
+          '업무무관 부동산, 대여금, 과다보유 현금 등이 해당합니다. 미입력 시 0%로 봅니다.',
+        ],
+      },
+      {
+        k: 'years', label: '피상속인(증여자) 경영기간', unit: '년', def: 15,
+        hint: (g) => (g.pick('route') === '증여세 과세특례'
+          ? ['조특법 제30조의6 — 부모의 계속경영 10년 이상이 과세특례 요건입니다.']
+          : ['상증법 제18조의2 — 경영기간에 따라 공제 한도가 10년 300억 / 20년 400억 / 30년 600억으로 올라갑니다.']),
+      },
+      {
+        k: 'route', label: '검토 경로', type: 'choice', opts: ['가업상속공제', '증여세 과세특례'],
+        def: '가업상속공제', sec: '검토 경로',
+        hint: (g) => (g.pick('route') === '증여세 과세특례'
+          ? ['생전에 주식을 증여하고 조특법 제30조의6의 저율과세(10% · 120억 초과분 20%)를 적용합니다.',
+            '아래 결과는 증여세만 산출합니다 — 상속세는 계산하지 않습니다.']
+          : ['상속 개시 후 상증법 제18조의2에 따라 가업상속재산을 과세가액에서 공제합니다.',
+            '아래 결과는 공제 적용 전후의 상속세와 절감액을 비교합니다.']),
+      },
+      { k: 'landUnit', label: '㎡당 토지 평가액', unit: '만원', adv: true, sec: '토지 (개편안 공제 축소)', hint: ['아래 「2026 개편안 적용 시」 세액에만 반영됩니다.', '검토 가액에 토지 전체 평가액이 포함되어 있다고 봅니다.'] },
+      { k: 'landArea', label: '토지 면적', unit: '㎡', adv: true },
+      { k: 'floorArea', label: '건축물 바닥면적', unit: '㎡', adv: true, hint: '공제범위 = 바닥면적 × 배율' },
+      { k: 'metro', label: '소재지', type: 'choice', opts: ['수도권', '그 외'], def: '수도권', adv: true, hint: '수도권(인구감소지역 제외) 2배 / 그 외 3배' },
+    ],
+    run(g) {
+      const isSpecial = g.pick('route') === '증여세 과세특례';
+      const args = {
+        // 이 항목은 법인 자산만 본다 — 총상속재산을 따로 받지 않으므로 가업 주식가액이 곧 상속재산이다.
+        businessValue: g.won('biz'), managementYears: g.num('years'), totalEstate: 0,
+        // 가업상속공제 외의 공제는 입력받지 않고 일괄공제를 적용한다 (계산 모듈 기본값).
+        unrelatedAssetRate: Math.min(100, g.num('unrelated')) / 100,
+        route: isSpecial ? '증여세과세특례' : '가업상속공제',
+        landUnitPrice: g.won('landUnit'), landArea: g.num('landArea'),
+        floorArea: g.num('floorArea'), isMetroArea: g.pick('metro') === '수도권',
+      };
+      const r = calculateBusinessSuccession(Object.assign({ basis: BASIS_CURRENT }, args));
+      const ref = calculateBusinessSuccession(Object.assign({ basis: BASIS_REFORM_2026 }, args));
+      const steps = [
+        ['법인 주식 검토 가액', W(r.businessValue), '경영기간 ' + r.managementYears + '년'],
+      ];
+      if (r.unrelatedAssetRate > 0) {
+        steps.push(['사업무관자산 제외', '− ' + W(r.unrelatedAssetValue),
+          '검토 가액 × ' + PCT(r.unrelatedAssetRate) + ' · 상증령 제15조 제5항']);
+        steps.push(['공제대상 가업재산', W(r.qualifiedValue), '검토 가액 × (1 − 사업무관자산 비율)']);
+      }
+      if (r.isLandReduced) {
+        steps.push(['공제대상 토지가액', W(r.landValueAfter),
+          '조정 전 ' + W(r.landValueBefore) + ' → min(토지 ' + N(g.num('landArea')) + '㎡, 바닥 '
+          + N(g.num('floorArea')) + '㎡ × ' + r.landMultiple + '배) × ㎡당 한도 1,000만원']);
+        steps.push(['조정 후 검토 가액', W(r.adjustedBusinessValue), '검토 가액 − 조정 전 토지 + 공제대상 토지']);
+      }
+      // 검토 경로에 따라 계산 과정을 완전히 갈라 놓는다.
+      // 두 경로는 세목(상속세 vs 증여세)도 시점(사후 vs 생전)도 다르므로 섞어 보여줄 이유가 없다.
+      if (isSpecial) {
+        steps.push(['과세특례 요건 — 부모 계속경영', r.meetsSpecialRequirement ? '충족' : '미충족',
+          '조특법 제30조의6 · ' + r.specialMinYears + '년 이상 필요 (현재 ' + r.managementYears + '년)']);
+        if (r.meetsSpecialRequirement) {
+          steps.push(['특례 적용 한도', W(r.deductionCap), '경영기간별 · 10년 300억 / 20년 400억 / 30년 600억']);
+          steps.push(['특례 적용 대상', W(r.deduction), 'min(공제대상 가업재산, 한도)']);
+          steps.push(['과세특례 공제', '− ' + W(r.specialDeduction), '조특법 제30조의6']);
+          steps.push(['과세표준', W(r.specialTaxBase), '특례 적용 대상 − 과세특례 공제']);
+          steps.push(['산출세액', W(r.specialGrossTax),
+            W(r.specialThreshold) + ' 이하 ' + PCT(r.specialRateLow)
+            + ' + 초과분 ' + PCT(r.specialRateHigh)]);
+          steps.push(['신고세액공제', '− ' + W(r.specialReportCredit), '산출세액 × 3%']);
+        }
+        // 가업상속공제 경로의 "공제 미적용 시 상속세 → 절감 효과"와 같은 구조로 비교분을 붙인다.
+        steps.push(['특례 미적용 시 증여세', W(r.normalGiftTax),
+          '일반 증여세율 10~50% · 증여재산공제 ' + W(r.normalGiftDeduction)
+          + ' · 과세표준 ' + W(r.normalGiftTaxBase)]);
+        steps.push(['특례 적용 시 증여세', W(r.meetsSpecialRequirement ? r.specialTax : r.normalGiftTax),
+          r.meetsSpecialRequirement
+            ? '저율과세 10% (120억원 초과분 20%) 적용'
+            : '요건 미충족 — 특례를 쓸 수 없어 일반 증여세를 그대로 부담합니다']);
+        steps.push(['절감 효과', W(r.specialSaving),
+          r.meetsSpecialRequirement ? '두 시나리오의 차액' : '요건 미충족으로 절감 없음']);
+      } else {
+        steps.push(['공제 한도', W(r.deductionCap), '현행 · 10년 300억 / 20년 400억 / 30년 600억']);
+        steps.push(['가업상속공제액', '− ' + W(r.deduction),
+          r.deductionCap === 0 ? '경영 10년 미만 — 공제 불가' : 'min(공제대상 가업재산, 한도)']);
+        steps.push(['일괄공제', '− ' + W(r.otherDeduction),
+          '상증법 제21조 · 공제 대상에서 빠진 사업무관자산·한도초과분에 적용됩니다']);
+        steps.push(['공제 미적용 시 상속세', W(r.taxWithout), '과세표준 ' + W(r.baseWithout)]);
+        steps.push(['공제 적용 시 상속세', W(r.taxWith), '과세표준 ' + W(r.baseWith)]);
+        steps.push(['절감 효과', W(r.saving), '두 시나리오의 차액']);
+      }
+
+      // 종부세·양도세와 같은 방식으로 현행을 주 결과로 하고 개편안을 아래에 병기한다.
+      const bits = [];
+      if (isSpecial) {
+        bits.push('부모 계속경영 요건 ' + ref.specialMinYears + '년 (현행 ' + r.specialMinYears + '년)');
+        bits.push(ref.meetsSpecialRequirement
+          ? '과세표준 ' + W(ref.specialTaxBase)
+          : '경영 ' + ref.specialMinYears + '년 미만 — 개편안 요건 미충족으로 특례 적용 불가');
+      } else if (ref.deductionCap === 0) {
+        bits.push('공제 한도 ' + W(ref.deductionCap));
+        bits.push('경영 20년 미만 — 개편안 요건 미충족으로 공제 불가');
+      } else {
+        bits.push('공제 한도 ' + W(ref.deductionCap));
+        bits.push('경영연수 × 20억 (최대 1,000억)');
+        if (ref.needsExtendedFollowUp) bits.push('30년 미달분만큼 사후관리기간 연장 전제');
+      }
+      if (ref.isLandReduced) {
+        bits.push('공제대상 토지 ' + W(ref.landValueBefore) + ' → ' + W(ref.landValueAfter)
+          + ' (바닥면적 × ' + ref.landMultiple + '배 · ㎡당 한도 1,000만원)');
+      }
+      // 특례 요건을 못 채우면 세금이 없어지는 것이 아니라 일반 증여세를 부담한다.
+      // total은 특례세액(0)이므로 그대로 쓰면 "요건 미충족 = 세금 0"으로 읽힌다.
+      const payable = (x) => (isSpecial && !x.meetsSpecialRequirement ? x.normalGiftTax : x.total);
+      if (isSpecial && !ref.meetsSpecialRequirement) bits.push('일반 증여세율 적용');
+      // 현행 대비 차액은 화면에 실제로 표시하는 두 값으로 계산한다.
+      const diff = payable(ref) - payable(r);
+      bits.push('현행 대비 ' + (diff === 0 ? '동일' : (diff > 0 ? '+' : '−') + W(Math.abs(diff))));
+      const compare = [{
+        label: isSpecial ? '증여세 과세특례 (개편안 적용)' : '가업상속공제 (개편안 적용)',
+        value: W(payable(ref)),
+        note: bits.join(' · '),
+      }];
+
+      const notes = [
+        '주 결과(위 큰 금액)는 현행 기준입니다. 아래 개편안 세액은 입법 확정 전 기준이며, 시행 시기는 2027.7.1. 이후 상속·증여 개시분입니다.',
+        isSpecial
+          ? '이 항목은 입력한 검토 지분만 보고 증여세 과세특례를 계산합니다. 같은 재산을 상속으로 넘길 때의 가업상속공제 효과는 검토 경로를 「가업상속공제」로 바꿔 확인하세요.'
+          : '이 항목은 입력한 검토 지분만 상속재산으로 보고 계산합니다. 부동산·금융자산 등 개인 재산을 합친 실제 상속세는 「상속세」 항목에서 확인하세요.',
+      ];
+      if (isSpecial) {
+        notes.push('「특례 미적용 시 증여세」는 성년 자녀 1명에게 같은 지분을 증여하는 표준 사례로 계산했습니다 (증여재산공제 '
+          + W(r.normalGiftDeduction) + '). 수증자가 여러 명이거나 10년 내 사전증여가 있으면 달라지므로, 정확한 비교는 「증여세」 항목에서 확인하세요.');
+      }
+      if (!ref.isLandReduced && g.num('landArea') === 0) {
+        notes.push('토지 항목을 입력하지 않아 개편안의 토지 공제 축소(배율 2~3배·㎡당 1,000만원 한도)가 반영되지 않았습니다.');
+      }
+      if (g.num('landArea') > 0) {
+        notes.push('현행 기준에서는 토지 공제 배율이 용도지역별(3~7배)로 갈려 용도지역 입력 없이 재계산하지 않습니다. 현행 세액에는 입력된 검토 가액을 그대로 사용했습니다.');
+      }
+      if (r.unrelatedAssetRate > 0 && g.num('landArea') > 0) {
+        notes.push('사업무관자산에 위 토지가 포함되어 있으면 토지 조정과 사업무관자산 제외가 겹칩니다. 두 값의 범위가 서로 겹치지 않는지 확인해 주세요.');
+      }
+      notes.push('업종 판정(세세분류 727개), 사후관리 10년, 심사위원회 절차는 계산 대상이 아니어서 반영되지 않았습니다.');
+      return {
+        total: payable(r),
+        label: isSpecial
+          ? (r.meetsSpecialRequirement
+            ? '예상 증여세 (과세특례 · 현행 기준)'
+            : '예상 증여세 (특례 요건 미충족 · 일반세율)')
+          : '공제 적용 후 예상 상속세 (현행 기준)',
+        sub: isSpecial
+          ? (r.meetsSpecialRequirement
+            ? '절감 ' + W(r.specialSaving)
+            : '경영 ' + r.managementYears + '년 — 특례 요건 ' + r.specialMinYears + '년 미달')
+          : '절감 ' + W(r.saving),
+        steps: steps,
+        compare: compare,
+        notes: notes,
+      };
+    },
+  },
+];
+
+const itemOf = (key) => ITEMS.find((i) => i.key === key);
+
+// ══════════════════════════ 상태 ══════════════════════════
+// 원칙 제4조 — 어떠한 저장소에도 저장하지 않고, 어디로도 전송하지 않는다.
+// 상태는 메모리에만 존재하며 새로고침 시 소멸한다.
+
+// 화면 번호. 0은 갈래 선택, 1~5는 세무검토 위저드, 6·7은 위저드 밖에서 언제든 열리는 화면이다.
+const STEP_START = 0;
+const STEP_WIZARD_LAST = 5;
+const STEP_SUMMARY = 6;
+const STEP_FP = 7;
+
+const state = {
+  step: STEP_START,
+  back: STEP_START,  // 종합 결과·FP센터에서 [←]를 눌렀을 때 돌아갈 화면
+  customerName: '', // 고객명. 저장·전송하지 않고 세션 메모리에만 둔다.
+  sex: '',
+  birth: '',
+  mode: '',
+  item: '',
+  vals: {},       // 현재 항목의 입력값 (문자열, 만원/명/년 등 표시 단위)
+  saved: {},      // 항목별 입력값 보존
+  savedMode: {},  // 항목별 검토 당시 모드 — 종합 결과를 같은 값으로 재계산하기 위해 함께 보관한다
+  done: [],
+  openEdit: false,
+  sumEdit: '',     // 종합 결과에서 입력값을 펼쳐 고치는 중인 항목 (한 번에 하나)
+  fpSelected: '',  // 지도·목록에서 고른 센터 이름
+  fpNear: null,    // 위치를 얻었을 때의 가까운 3곳. 얻기 전·실패 시에는 null
+  fpMsg: null,     // { text, kind } 위치 조회 상태 안내
+  fpBusy: false,
+  resetArmed: false,   // 「입력값 초기화」를 한 번 눌러 확인을 기다리는 상태
+  // 첫 항목을 검토한 시점의 고객. 이후 고객이 바뀌면 앞 고객의 금액이 새 이름 아래
+  // 표시될 수 있어 경고를 띄운다 (자동으로 지우지는 않는다 — 오타 수정으로 입력을 날리면 더 나쁘다).
+  reviewedFor: null,
+};
+
+// 검토 결과가 있는데 고객 정보가 그때와 달라졌으면 앞 고객의 이름을 돌려준다.
+function staleCustomer() {
+  const r = state.reviewedFor;
+  if (!r || state.done.length === 0) return null;
+  const same = r.name === state.customerName && r.sex === state.sex && r.birth === state.birth;
+  return same ? null : (r.name || '이전 고객');
+}
+
+// ── 입력값 접근자 — 심화 전용 필드는 간편 모드에서 법정 기본 가정값으로 대체한다 ──
+function accessor() {
+  const simple = state.mode === 'simple';
+  const fields = allFields();
+  const find = (k) => fields.find((f) => f.k === k);
+  function raw(k) {
+    const f = find(k);
+    if (f.adv && simple) return f.simple !== undefined ? f.simple : 0;
+    const v = state.vals[k];
+    if (v === undefined || v === '') return f.def !== undefined ? f.def : 0;
+    return Number(v) || 0;
+  }
+  return {
+    num: (k) => raw(k),
+    won: (k) => raw(k) * MANWON,
+    // 생년월일처럼 숫자로 환산하면 안 되는 값은 원문 문자열로 읽는다.
+    raw: (k) => {
+      const f = find(k);
+      if (f && f.adv && simple) return '';
+      return state.vals[k] === undefined ? '' : state.vals[k];
+    },
+    pick: (k) => {
+      const f = find(k);
+      const v = state.vals[k];
+      return v === undefined || v === '' ? f.def : v;
+    },
+  };
+}
+
+function visibleFields() {
+  return allFields().filter((f) => state.mode === 'deep' || !f.adv);
+}
+
+// 선택지가 비활성으로 바뀌기 전에 고른 값이 state에 남아 있을 수 있다.
+// 계산과 표시 모두 "지금 유효한 선택지"를 봐야 하므로 여기서 정규화한다.
+function pickValid(g, key) {
+  const f = allFields().find((x) => x.k === key);
+  const cur = g.pick(key);
+  if (!f || typeof f.disabledOpts !== 'function') return cur;
+  const blocked = f.disabledOpts(g);
+  if (blocked.indexOf(cur) < 0) return cur;
+  return f.opts.find((o) => blocked.indexOf(o) < 0) || cur;
+}
+
+// YYYYMMDD 8자리를 {y, m, d}로 파싱한다. 형식이 틀리면 null.
+function parseDate(digits) {
+  const s = String(digits || '');
+  if (s.length !== 8) return null;
+  const y = +s.slice(0, 4), m = +s.slice(4, 6), d = +s.slice(6, 8);
+  if (y < 1900 || y > 2200 || m < 1 || m > 12 || d < 1 || d > 31) return null;
+  return { y: y, m: m, d: d };
+}
+
+// ITEMS 정의에서 값으로 참조하므로 호이스팅되는 함수 선언으로 둔다.
+function formatDate(digits) {
+  const p = parseDate(digits);
+  return p === null ? '' : p.y + '-' + String(p.m).padStart(2, '0') + '-' + String(p.d).padStart(2, '0');
+}
+
+// 기준일 시점의 만 나이. refDigits를 주지 않으면 오늘을 기준으로 한다.
+// 상속·증여 공제의 나이 판정 기준일은 상속개시일·증여일이므로 호출측이 기준일을 넘긴다.
+function ageFromBirth(digits, refDigits) {
+  const b = parseDate(digits);
+  if (b === null) return null;
+  const r = parseDate(refDigits);
+  let ry, rm, rd;
+  if (r === null) {
+    const now = new Date();
+    ry = now.getFullYear(); rm = now.getMonth() + 1; rd = now.getDate();
+  } else {
+    ry = r.y; rm = r.m; rd = r.d;
+  }
+  let a = ry - b.y;
+  if (b.m > rm || (b.m === rm && b.d > rd)) a -= 1;
+  return a >= 0 && a < 130 ? a : null;
+}
+
+function age() {
+  return ageFromBirth(state.birth);
+}
+
+// 상속세 나이 판정 기준일 — 미입력 시 오늘.
+function inheritRefDate() {
+  return state.mode === 'deep' ? (state.vals.deathDate || '') : '';
+}
+
+// 증여세 미성년 판정 기준일 — 미입력 시 오늘.
+function giftRefDate() {
+  return state.mode === 'deep' ? (state.vals.giftDate || '') : '';
+}
+
+// YYYYMMDD 두 날짜 사이의 개월 수. 날짜가 틀렸거나 역순이면 0.
+function monthsBetween(fromDigits, toDigits) {
+  const a = parseDate(fromDigits);
+  const b = parseDate(toDigits);
+  if (a === null || b === null) return 0;
+  let m = (b.y - a.y) * 12 + (b.m - a.m);
+  if (b.d < a.d) m -= 1;
+  return m > 0 ? m : 0;
+}
+
+// 임원퇴직금 — 입사일·퇴직일을 소득세법 제22조 제3항의 세 구간으로 자른다.
+// 경계일은 2012.1.1.과 2020.1.1.이다. 월수만 계산하고, 연수 배분은 계산 모듈이 한다.
+function serviceSpans() {
+  const join = state.vals.joinDate || '';
+  const out = state.vals.retireDate || '';
+  const total = monthsBetween(join, out);
+  if (total === 0) {
+    return { serviceYears: 0, yearsUntil2011: 0, years2012to2019: 0, yearsAfter2020: 0, months: 0 };
+  }
+  const BOUND_2012 = '20120101';
+  const BOUND_2020 = '20200101';
+  const earlier = (x, y) => (x < y ? x : y);
+  const later = (x, y) => (x > y ? x : y);
+  const spans = allocateServiceYears({
+    totalMonths: total,
+    monthsUntil2011: monthsBetween(join, earlier(out, BOUND_2012)),
+    months2012to2019: monthsBetween(later(join, BOUND_2012), earlier(out, BOUND_2020)),
+  });
+  spans.months = total;
+  return spans;
+}
+
+// 비상장주식 — 최근 3년 순손익액의 가중평균 (원 단위)
+function weightedIncomeOf(g) {
+  return calculateWeightedNetIncome([g.won('inc1'), g.won('inc2'), g.won('inc3')]);
+}
+
+// ══════════════════════════ 항목별 검토 기록 ══════════════════════════
+
+// 입력값과 "검토 당시 모드"를 함께 보관한다. 모드를 함께 두는 이유:
+// 간편 모드는 심화 필드에 법정 기본 가정값을 넣으므로, 나중에 심화 모드에서 다시 계산하면
+// 같은 입력값이어도 결과가 달라진다. 종합 결과는 화면에서 본 값과 일치해야 한다.
+function saveCurrent() {
+  if (!state.item) return;
+  state.saved[state.item] = Object.assign({}, state.vals);
+  state.savedMode[state.item] = state.mode;
+  if (!state.reviewedFor) {
+    state.reviewedFor = { name: state.customerName, sex: state.sex, birth: state.birth };
+  }
+}
+
+// 검토를 마친 값을 고치고 있는 화면인지. 결과 화면(STEP 5)과 종합 결과 둘 다
+// 저장된 스냅샷을 다시 읽어 그리므로, 한 글자 고칠 때마다 스냅샷에 반영해야 화면이 따라온다.
+const editingSaved = () => state.step === 5 || state.step === STEP_SUMMARY;
+
+// 보관된 스냅샷으로 항목을 다시 계산한다.
+// run()·allFields()가 전역 상태(현재 항목·입력값·모드)를 읽으므로 잠시 바꿔치기했다가 되돌린다.
+function withSaved(key, fn) {
+  const keep = { vals: state.vals, mode: state.mode, item: state.item };
+  state.vals = Object.assign({}, state.saved[key] || {});
+  state.mode = state.savedMode[key] || state.mode;
+  state.item = key;
+  try {
+    return fn(accessor());
+  } finally {
+    state.vals = keep.vals;
+    state.mode = keep.mode;
+    state.item = keep.item;
+  }
+}
+
+// 종합 결과 한 칸. 검토하지 않은 항목은 null — 화면에서 공란으로 남는다.
+function reviewOf(key) {
+  if (state.done.indexOf(key) < 0) return null;
+  return withSaved(key, (g) => ({
+    mode: state.mode,
+    res: itemOf(key).run(g),
+    inputs: visibleFields()
+      .filter((f) => f.type !== 'readonly')   // 자동 조회값은 입력이 아니므로 제외한다
+      .map((f) => [f.label, inputText(f, g)])
+      .filter((row) => row[1] !== ''),
+  }));
+}
+
+// 입력값을 그대로 옮겨 적는다. 손대지 않아 0인 칸은 적지 않는다 — 기록이 읽히지 않는다.
+function inputText(f, g) {
+  if (f.type === 'choice') return pickValid(g, f.k);
+  if (f.type === 'date') return formatDate(g.raw(f.k));
+  const typed = state.vals[f.k];
+  const n = g.num(f.k);
+  if (n === 0 && (typed === undefined || typed === '')) return '';
+  return withCommas(n) + (f.unit ? ' ' + f.unit : '');
+}
+
+// ══════════════════════════ 단계별 유효성 (FR-05) ══════════════════════════
+
+function firstRequiredField() {
+  return visibleFields().find((f) => f.type !== 'choice' && f.unit === '만원');
+}
+
+function ctaFor() {
+  if (state.step === 1) {
+    const ok = state.customerName.trim().length > 0 && !!state.sex && age() !== null;
+    return { label: '다음', ok: ok, act: () => go(2) };
+  }
+  if (state.step === 2) return { label: '다음', ok: !!state.mode, act: () => go(3) };
+  if (state.step === 3) return { label: '항목을 선택하세요', ok: false, act: () => {} };
+  if (state.step === 4) {
+    const f = firstRequiredField();
+    const g = accessor();
+    // 항목이 자체 준비조건을 선언하면 그것을 따른다 (예: 임원퇴직금의 입사일·퇴직일).
+    const chk = itemOf(state.item).ready;
+    const own = chk ? chk(g) : null;
+    const ok = own ? own.ok : (!!f && g.num(f.k) > 0);
+    return {
+      label: own ? own.label : (ok ? '결과 보기' : (f ? f.label + '을(를) 입력하세요' : '결과 보기')),
+      ok: ok,
+      act: () => {
+        if (state.done.indexOf(state.item) < 0) state.done.push(state.item);
+        saveCurrent();
+        go(5);
+      },
+    };
+  }
+  return null;
+}
+
+// ══════════════════════════ 렌더 ══════════════════════════
+
+// 상담 내용을 모두 지우고 첫 화면으로 돌아간다.
+// 고객 정보·항목별 입력값·검토 완료 목록은 물론, 위치 조회 결과까지 함께 비운다 —
+// 다음 고객 화면에 앞 상담의 흔적이 남지 않아야 한다.
+function resetAll() {
+  state.customerName = '';
+  state.sex = '';
+  state.birth = '';
+  state.mode = '';
+  state.item = '';
+  state.vals = {};
+  state.saved = {};
+  state.savedMode = {};
+  state.done = [];
+  state.reviewedFor = null;
+  state.openEdit = false;
+  state.sumEdit = '';
+  state.fpSelected = '';
+  state.fpNear = null;
+  state.fpMsg = null;
+  state.fpBusy = false;
+  state.back = STEP_START;
+  go(STEP_START);
+}
+
+function go(step) {
+  // 확인 대기 상태는 화면을 옮기면 풀린다 — 눌러 둔 채 잊고 나중에 눌리는 일을 막는다.
+  state.resetArmed = false;
+  // 종합 결과를 떠나면 펼쳐 둔 수정 패널을 닫는다. 다른 항목을 열면 현재 항목·입력값이
+  // 그 항목으로 바뀌므로, 열린 채로 돌아오면 엉뚱한 항목의 입력란이 그려진다.
+  if (step !== STEP_SUMMARY) state.sumEdit = '';
+  state.step = step;
+  render();
+  window.scrollTo(0, 0);
+}
+
+function openItem(key, replay) {
+  state.item = key;
+  state.vals = replay ? Object.assign({}, state.saved[key] || {}) : {};
+  state.openEdit = false;
+  go(replay ? 5 : 4);
+}
+
+// 상단 이동 버튼. 고객 정보 화면부터 나타나고, 어느 단계에서나 눌러도 진행 상태는 남는다.
+function navHtml() {
+  if (state.step === STEP_START) return '';
+  const n = state.done.length;
+  // 지울 것이 있을 때만 초기화를 열어 둔다.
+  const hasData = !!(state.customerName || state.birth || state.sex
+    || state.done.length > 0 || Object.keys(state.saved).length > 0);
+  // 좁은 화면용 짧은 이름을 함께 넣고 CSS가 하나만 보여준다.
+  // 자바스크립트로 폭을 재면 창 크기를 바꿀 때마다 다시 그려야 하므로 CSS에 맡긴다.
+  // 「검토결과 확인」은 짧아서 좁은 화면에도 그대로 들어가므로 이름을 나누지 않는다.
+  const label = (wide, narrow) =>
+    '<span class="lbl-wide">' + wide + '</span><span class="lbl-narrow">' + narrow + '</span>';
+
+  // 되돌릴 수 없으므로 한 번 누르면 확인 상태가 되고, 다시 눌러야 실제로 지운다.
+  const reset = state.resetArmed
+    ? '<button class="navbtn armed" data-act="resetAll" title="한 번 더 누르면 지웁니다">'
+      + label('초기화 확인', '확인') + '</button>'
+    : '<button class="navbtn" data-act="resetAll"' + (hasData ? '' : ' disabled')
+      + ' title="' + (hasData ? '고객 정보와 모든 검토 내용을 지웁니다' : '지울 입력값이 없습니다') + '">'
+      + label('입력값 초기화', '초기화') + '</button>';
+
+  // 첫 슬라이드로 돌아간다. 검토 진행 상태는 그대로 남아 있어 다시 들어와 이어서 볼 수 있다.
+  return '<button class="navbtn" data-act="gotoStart" title="첫 화면으로 돌아갑니다 (입력값은 유지)">'
+      + '처음으로</button>'
+    + reset
+    + '<button class="navbtn' + (state.step === STEP_SUMMARY ? ' on' : '') + '"'
+      + ' data-act="gotoSummary"' + (n === 0 ? ' disabled' : '')
+      + ' title="' + (n === 0 ? '세무 항목을 1개 이상 검토하면 열립니다' : n + '개 항목 검토 완료') + '">'
+      + '검토결과 확인' + (n > 0 ? ' ' + n : '') + '</button>'
+    + '<button class="navbtn' + (state.step === STEP_FP ? ' on' : '') + '" data-act="gotoFp">'
+      + label('FP센터 위치', 'FP센터') + '</button>';
+}
+
+// 돌아갈 곳. 없으면 null이고, 그때는 「이전」 버튼을 만들지 않는다.
+// 위저드 밖의 화면(종합 결과·FP센터)은 눌러 들어온 화면으로 돌아간다.
+function prevFor() {
+  if (state.step === STEP_START) return null;
+  if (state.step === STEP_SUMMARY || state.step === STEP_FP) return { to: state.back };
+  return { to: state.step - 1 };
+}
+
+function renderHeader() {
+  const wizard = state.step >= 1 && state.step <= STEP_WIZARD_LAST;
+  // 위저드 밖의 화면(시작·FP센터)에서는 진행 표시가 의미가 없다. 다만 자리는 남긴다 —
+  // 지워 버리면 그 화면만 헤더가 낮아져 본문이 위로 튄다.
+  // 같은 줄의 빵가루는 그대로 보여야 하므로 진행 표시만 감춘다.
+  document.getElementById('prog').style.visibility =
+    (state.step === STEP_START || state.step === STEP_FP) ? 'hidden' : 'visible';
+  document.getElementById('stepText').textContent =
+    wizard ? 'STEP ' + state.step + ' / ' + STEP_WIZARD_LAST : '종합 결과';
+  document.getElementById('bar').style.width =
+    (wizard ? (state.step / STEP_WIZARD_LAST) * 100 : 100) + '%';
+  document.getElementById('hdrNav').innerHTML = navHtml();
+
+  const crumbs = [];
+  const a = age();
+  if (state.step > 1 && state.customerName) {
+    const parts = [state.customerName];
+    if (state.sex) parts.push(state.sex === 'M' ? '남' : '여');
+    if (a !== null) parts.push('만 ' + a + '세');
+    crumbs.push(parts.join(' · '));
+  }
+  if (state.step > 2 && state.step <= STEP_WIZARD_LAST && state.mode) {
+    crumbs.push(state.mode === 'simple' ? '간편' : '심화');
+  }
+  // 항목 이름은 그 항목을 다루는 화면에서만 붙인다. 종합 결과·FP센터에서는 맞지 않는다.
+  if ((state.step === 4 || state.step === 5) && state.item) crumbs.push(itemOf(state.item).name);
+  document.getElementById('crumbs').innerHTML =
+    crumbs.map((c) => '<span class="crumb">' + esc(c) + '</span>').join('');
+}
+
+// 힌트는 문자열, 문자열 배열, 또는 그중 하나를 반환하는 함수다.
+// 함수면 현재 입력값을 받아 계산 결과를 곁들인 문구를 만든다
+// (계산 자체는 calc.js가 하고, 여기서는 표시만 한다).
+// 배열이면 문장마다 줄을 바꿔 표시한다 — 설명이 길어지면 한 줄로 붙어 읽기 어렵다.
+function hintLines(f) {
+  if (!f.hint) return [];
+  const v = typeof f.hint === 'function' ? f.hint(accessor()) : f.hint;
+  return (Array.isArray(v) ? v : [v]).filter((line) => !!line);
+}
+
+function hintHtml(f) {
+  return hintLines(f).map(esc).join('<br>');
+}
+
+// 선택지 버튼들. 비활성 상태가 다른 입력값에 따라 달라지므로(예: 주택 수 → 거주 여부)
+// 갱신 경로에서도 다시 그릴 수 있게 따로 뽑아 둔다.
+function optsHtml(f, g) {
+  const cur = pickValid(g, f.k);
+  // 논리적으로 성립하지 않는 선택지는 비활성화한다 (예: 1세대1주택 비과세 + 다주택 중과).
+  const blocked = typeof f.disabledOpts === 'function' ? f.disabledOpts(g) : [];
+  return f.opts.map((o) => {
+    const off = blocked.indexOf(o) >= 0;
+    return '<button class="opt' + (o === cur && !off ? ' on' : '') + '"'
+      + (off ? ' disabled' : ' data-act="choice" data-k="' + f.k + '" data-v="' + esc(o) + '"')
+      + '>' + esc(o) + '</button>';
+  }).join('');
+}
+
+function fieldHtml(f, compact) {
+  const g = accessor();
+  let inner = '';
+  if (f.type === 'choice') {
+    inner = '<div class="opts" data-opts="' + f.k + '">' + optsHtml(f, g) + '</div>';
+  } else if (f.type === 'date') {
+    // 날짜 8자리를 받고, 같은 줄 오른쪽에 파생값(만 나이·서식화된 날짜)을 표시한다.
+    const v = state.vals[f.k] === undefined ? '' : state.vals[f.k];
+    inner = '<div class="num-wrap">'
+      + '<input class="num" inputmode="numeric" placeholder="' + esc(f.placeholder || '20120314') + '" autocomplete="off"'
+      + ' data-inp="dateval" data-k="' + f.k + '" value="' + esc(v) + '"'
+      + ' style="text-align:left;font-variant-numeric:tabular-nums;letter-spacing:1px">'
+      + '<span class="derived" data-derived="' + f.k + '">' + esc(f.derive ? f.derive(v) : '') + '</span></div>'
+      + '<div class="err" data-err="' + f.k + '"></div>';
+  } else if (f.type === 'readonly') {
+    // 표에서 조회한 값을 그대로 보여준다. 입력받지 않는다.
+    inner = '<div class="num-wrap">'
+      + '<input class="num" readonly tabindex="-1" data-derived-input="' + f.k + '"'
+      + ' value="' + esc(f.value(g)) + '">'
+      + '<span class="unit">' + esc(f.unit || '') + '</span></div>';
+  } else {
+    const v = state.vals[f.k];
+    const shown = v === undefined ? (f.def !== undefined ? String(f.def) : '') : v;
+    inner = '<div class="num-wrap">'
+      + '<input class="num" inputmode="numeric" placeholder="0" autocomplete="off" data-inp="val" data-k="' + f.k + '" value="' + esc(withCommas(shown)) + '">'
+      + '<span class="unit">' + esc(f.unit || '') + '</span></div>'
+      + '<div class="err" data-err="' + f.k + '"></div>';
+  }
+  return (!compact && f.secShow ? '<div class="sec-label">' + esc(f.sec) + '</div>' : '')
+    + '<div class="field">'
+    + '<label>' + esc(f.label) + '</label>'
+    + inner
+    + (!compact && f.hint
+      ? '<div class="hint" data-hint="' + f.k + '">' + hintHtml(f) + '</div>'
+      : '')
+    // 출처 링크는 힌트 문구와 분리해 둔다 — 힌트는 이스케이프 대상이므로 마크업을 섞지 않는다.
+    + (!compact && f.link
+      ? '<div class="hint"><a href="' + esc(f.link.url) + '" target="_blank" rel="noopener noreferrer">'
+        + esc(f.link.label) + '</a></div>'
+      : '')
+    + '</div>';
+}
+
+// 섹션 헤더는 값이 바뀌는 첫 필드에만 붙인다.
+function withSectionFlags(fields) {
+  let last = null;
+  return fields.map((f) => {
+    const show = !!f.sec && f.sec !== last;
+    if (f.sec) last = f.sec;
+    return Object.assign({}, f, { secShow: show });
+  });
+}
+
+// 고객이 바뀌었는데 앞 고객의 검토 결과가 남아 있을 때의 경고.
+// 자동으로 지우지 않는 이유는 위 staleCustomer() 주석에 적었다.
+function staleWarnHtml() {
+  const prev = staleCustomer();
+  if (!prev) return '';
+  return '<div class="warn"><div class="warn-title">이전 고객의 검토 결과가 남아 있습니다</div>'
+    + '<div class="warn-body">' + esc(prev) + '님의 입력값과 결과가 그대로 있습니다. '
+    + '새 고객이라면 우측 상단 <b>입력값 초기화</b>를 눌러 지워주세요.</div></div>';
+}
+
+function renderStep1() {
+  const a = age();
+  const sexBtn = (v, label) =>
+    '<button class="opt' + (state.sex === v ? ' on' : '') + '" data-act="sex" data-v="' + v + '">' + label + '</button>';
+  return '<div class="pane">'
+    + '<div class="eyebrow">01 · 고객 정보</div>'
+    + '<h1>고객 정보를 입력해주세요</h1>'
+    + '<div id="staleWarn">' + staleWarnHtml() + '</div>'
+    + '<div style="height:26px"></div>'
+    + '<div class="fields">'
+    + '<div class="field"><label>고객명</label>'
+    // 브라우저 자동완성은 끈다 — 의도하지 않은 값이 채워지는 것을 막는다.
+    + '<input class="txt" placeholder="홍길동" data-inp="customerName"'
+    + ' autocomplete="off" autocapitalize="off" spellcheck="false"'
+    + ' value="' + esc(state.customerName) + '"></div>'
+    + '<div class="field"><label>성별</label><div class="duo">' + sexBtn('M', '남성') + sexBtn('F', '여성') + '</div></div>'
+    + '<div class="field"><label>생년월일</label>'
+    + '<input class="txt mono" placeholder="19620314" inputmode="numeric" data-inp="birth" autocomplete="off" value="' + esc(state.birth) + '">'
+    + '<div class="hint">만 <span id="ageText">' + (a === null ? '—' : a + '세') + '</span></div></div>'
+    + '</div></div>';
+}
+
+function renderStep2() {
+  const card = (v, name, tag, tagClass, desc) =>
+    '<button class="mode-card' + (state.mode === v ? ' on' : '') + '" data-act="mode" data-v="' + v + '">'
+    + '<div class="mode-head"><span class="mode-name">' + name + '</span>'
+    + '<span class="tag ' + tagClass + '">' + tag + '</span></div>'
+    + '<div class="mode-desc">' + desc + '</div></button>';
+  return '<div class="pane">'
+    + '<div class="eyebrow">02 · 검토 모드</div>'
+    + '<h1>어느 모드로 볼까요?</h1><div style="height:22px"></div>'
+    + '<div class="stack" style="gap:14px">'
+    + card('simple', '간편', '최소 입력 · 60초', 'blue', '필수값만 입력, 나머지는 법정 기본 가정 적용')
+    + card('deep', '심화', '세부 옵션 전부', '', '채무·사전증여·중과 등 개별 공제와 예외까지 직접 지정')
+    + '</div></div>';
+}
+
+function renderStep3() {
+  const cards = ITEMS.map((it, i) => {
+    const done = state.done.indexOf(it.key) >= 0;
+    return '<button class="item-card' + (done ? ' done' : '') + '" data-act="item" data-v="' + it.key + '">'
+      + '<span class="item-num">' + String(i + 1).padStart(2, '0') + '</span>'
+      + '<span class="item-body"><span class="item-name">' + esc(it.name) + '</span>'
+      + '<span class="item-desc">' + esc(it.desc) + '</span></span>'
+      + (done ? '<span class="item-tag">검토 완료</span>' : '')
+      + '</button>';
+  }).join('');
+  return '<div class="pane">'
+    + '<div class="eyebrow">03 · 검토 항목</div>'
+    + '<h1>무엇을 검토할까요?</h1><div style="height:22px"></div>'
+    + '<div class="stack">' + cards + '</div></div>';
+}
+
+function renderStep4() {
+  const item = itemOf(state.item);
+  const rows = withSectionFlags(visibleFields()).map((f) => fieldHtml(f, false)).join('');
+  return '<div class="pane">'
+    + '<div class="eyebrow">04 · 필요 정보 입력</div>'
+    + '<h1>' + esc(item.name) + '</h1>'
+    + '<div class="mode-line"><span>' + (state.mode === 'simple' ? '간편' : '심화') + ' 모드</span>'
+    + '<button class="link" data-act="swapMode">'
+    + (state.mode === 'simple' ? '심화로 바꾸기' : '간편으로 바꾸기') + '</button></div>'
+    + '<div class="fields">' + rows + '</div></div>';
+}
+
+function resultHtml() {
+  const item = itemOf(state.item);
+  const res = item.run(accessor());
+  const rows = res.steps.map((s) =>
+    '<div class="step-row"><div class="step-main">'
+    + '<span class="step-name">' + esc(s[0]) + '</span>'
+    + '<span class="step-val">' + esc(s[1]) + '</span></div>'
+    + (s[2] ? '<div class="step-note">' + esc(s[2]) + '</div>' : '')
+    + '</div>').join('');
+  return '<div class="res">'
+    + '<div class="res-head"><span class="res-chip">' + esc(item.name) + '</span>'
+    + '<span class="res-mode">' + (state.mode === 'simple' ? '간편' : '심화') + ' 모드</span></div>'
+    + '<div class="res-label">' + esc(res.label) + '</div>'
+    + '<div class="res-total">' + esc(W(res.total)) + '</div>'
+    + '<div class="res-sub">' + esc(res.sub) + '</div></div>'
+    // 시나리오 비교표 — 상세 계산보다 먼저 읽히도록 결과 카드 바로 아래에 둔다.
+    + ((res.tables && res.tables.length > 0)
+      ? res.tables.map((t) =>
+        '<div class="block"><div class="block-label">' + esc(t.label) + '</div>'
+        + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+        + t.head.map((h) => '<th>' + esc(h) + '</th>').join('')
+        + '</tr></thead><tbody>'
+        + t.rows.map((r) =>
+          '<tr' + (r.on ? ' class="on"' : (r.sum ? ' class="sum"' : '')) + '>'
+          + r.cells.map((c) => '<td>' + esc(c) + '</td>').join('')
+          + '</tr>').join('')
+        + '</tbody></table></div>'
+        + (t.note ? '<div class="tbl-note">' + esc(t.note) + '</div>' : '')
+        + '</div>').join('')
+      : '')
+    + '<div class="block"><div class="block-label">계산 과정</div>'
+    + '<div class="steps">' + rows + '</div>'
+    // FR-06 — 개산 고지는 결과 표시 시 항상 함께 노출된다.
+    + '<div class="notice"><span class="notice-mark">!</span>'
+    + '<span class="notice-text">참고용 <b>개산</b>입니다. 확정 세액은 전문가 검토가 필요합니다. 기준일자 ' + BASIS_DATE + '</span>'
+    + '</div>'
+    // 개편안 등 다른 기준의 세액을 함께 보여줄 때만 나타난다.
+    + ((res.compare && res.compare.length > 0)
+      ? '<div class="block"><div class="block-label">2026 개편안 적용 시 (참고)</div>'
+        + '<div class="steps">'
+        + res.compare.map((c) =>
+          '<div class="step-row"><div class="step-main">'
+          + '<span class="step-name">' + esc(c.label) + '</span>'
+          + '<span class="step-val">' + esc(c.value) + '</span></div>'
+          + (c.note ? '<div class="step-note">' + esc(c.note) + '</div>' : '')
+          + '</div>').join('')
+        + '</div></div>'
+      : '')
+    // 적용 기준·자료 한계 고지 — 개편안을 선택했거나 반영하지 못한 항목이 있을 때만 노출된다.
+    + ((res.notes && res.notes.length > 0)
+      ? '<div class="warn"><div class="warn-title">적용 기준 고지</div><ul class="warn-list">'
+        + res.notes.map((n) => '<li>' + esc(n) + '</li>').join('')
+        + '</ul></div>'
+      : '')
+    + '</div>';
+}
+
+function renderStep5() {
+  const editRows = withSectionFlags(visibleFields()).map((f) => fieldHtml(f, true)).join('');
+  const remaining = ITEMS.filter((i) => state.done.indexOf(i.key) < 0);
+  const nextList = remaining.map((it) =>
+    '<button class="next-item" data-act="item" data-v="' + it.key + '">'
+    + '<span class="item-num">' + String(ITEMS.indexOf(it) + 1).padStart(2, '0') + '</span>'
+    + '<span class="item-body"><span class="item-name">' + esc(it.name) + '</span>'
+    + '<span class="item-desc">' + esc(it.desc) + '</span></span>'
+    + '<span class="arrow">→</span></button>').join('');
+
+  return '<div class="pane">'
+    + '<div class="eyebrow">05 · 결과</div>'
+    + '<div id="resultArea">' + resultHtml() + '</div>'
+    + '<div class="block">'
+    + '<button class="edit-toggle" data-act="toggleEdit">'
+    + '<span>' + (state.openEdit ? '입력값 접기' : '입력값 수정') + '</span>'
+    + '<span style="color:var(--accent);font-size:13px">즉시 재계산</span></button>'
+    + (state.openEdit
+      ? '<div class="edit-panel"><div class="mode-line" style="margin:0">'
+        + '<span style="font-size:13px;color:var(--muted)">'
+        + (state.mode === 'simple' ? '간편' : '심화') + ' 모드 입력값</span>'
+        + '<button class="link" data-act="swapMode">'
+        + (state.mode === 'simple' ? '심화로 바꾸기' : '간편으로 바꾸기') + '</button></div>'
+        + editRows + '</div>'
+      : '')
+    + '</div>'
+    + '<div class="block" style="margin-top:44px">'
+    + '<div class="block-label">다음 검토 항목</div>'
+    + (remaining.length > 0 ? '<div class="stack tight">' + nextList + '</div>' : '')
+    + (remaining.length === 0
+      ? '<div class="all-done"><div class="all-done-t">' + ITEMS.length + '개 항목 검토 완료</div>'
+        + '<div class="all-done-d">항목별 결과와 가정을 한 화면에서 확인할 수 있습니다.</div>'
+        + '<button class="navbtn" data-act="gotoSummary" style="margin-top:14px">세무검토 결과확인</button></div>'
+      : '')
+    + '</div></div>';
+}
+
+// ══════════════════════════ 시작 화면 ══════════════════════════
+
+// ── 하단 장식 캐릭터 ──
+// 사내 인증 도안(assets/bichumi.png)을 그대로 쓴다. 임의로 다시 그린 그림으로 대체하지 않는다.
+// 아티팩트 빌드 시 이 경로가 data URI로 치환되어 파일 하나에 담긴다 —
+// 외부 주소를 가리키지 않으므로 네트워크 요청이 생기지 않는다 (원칙 제4조).
+const MASCOT_IMG = 'assets/bichumi.png';
+
+function mascotsHtml() {
+  return '<div class="mascots"><img src="' + MASCOT_IMG + '" alt="" aria-hidden="true"></div>';
+}
+
+function renderStart() {
+  return '<div class="pane pane-start">'
+    + '<div class="split">'
+    + '<button class="split-card" data-act="startTax">'
+    + '<div class="split-title">세무 검토</div>'
+    + '<div class="split-desc">상속·증여·양도·법인 ' + ITEMS.length + '개 항목을 단계별로 개산합니다.</div>'
+    + '<div class="split-meta">세법 기준일자 ' + BASIS_DATE + '</div>'
+    + '<div class="split-go">검토 시작 →</div></button>'
+    + '<button class="split-card" data-act="startFp">'
+    + '<div class="split-title">FP센터</div>'
+    + '<div class="split-desc">위치와 연락처를 지도에서 확인합니다. 위치를 허용하면 가까운 순으로 정렬됩니다.</div>'
+    + '<div class="split-meta">전국 ' + CENTERS.length + '개 센터</div>'
+    + '<div class="split-go">위치 보기 →</div></button>'
+    + '</div>'
+    + mascotsHtml()
+    + '</div>';
+}
+
+// ══════════════════════════ FP센터 위치 ══════════════════════════
+// 지도 SDK를 싣지 않는다 — 외부 스크립트와 JavaScript 키가 필요해 원칙 제4조와 충돌한다.
+// 대신 좌표를 직접 투영한 개략도를 그리고, 실제 지도는 카카오맵 공개 링크로 넘긴다
+// (링크는 사용자가 눌렀을 때의 화면 이동이므로 데이터 전송이 아니다).
+
+const FP_MAP_WIDTH = 280;
+const FP_LABEL_GAP = 13;   // 라벨 글자 크기보다 조금 넓게 — 수도권 4곳이 세로로 몰려 있다
+
+// 준법감시 유효기간 판정용 오늘 날짜. 세법 자료 기준일자(BASIS_DATE)와는 다른 값이다.
+function todayIso() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+
+const fpDistText = (km) => (km < 1 ? '1km 이내' : km.toFixed(1) + 'km');
+
+// 핀 위치는 실제 좌표 그대로 두고, 겹치는 라벨만 아래로 밀어낸다.
+// 좌우 어느 쪽에 붙는 라벨인지에 따라 따로 쌓는다.
+function fpPinLayout(size) {
+  const pins = CENTERS.map((c) => {
+    const p = projectPoint(c.lat, c.lng, size);
+    return { name: c.이름, short: c.이름.replace('FP센터', ''), x: p.x, y: p.y, left: p.x > size.w * 0.6 };
+  });
+  [true, false].forEach((side) => {
+    let last = -Infinity;
+    pins.filter((p) => p.left === side).sort((a, b) => a.y - b.y).forEach((p) => {
+      p.ly = Math.max(p.y, last + FP_LABEL_GAP);
+      last = p.ly;
+    });
+  });
+  return pins;
+}
+
+function fpMapSvg() {
+  const size = mapSize(FP_MAP_WIDTH);
+  const near = state.fpNear ? state.fpNear.map((c) => c.이름) : [];
+  const land = KOREA_OUTLINE.map((pt, i) => {
+    const p = projectPoint(pt[0], pt[1], size);
+    return (i === 0 ? 'M' : 'L') + p.x.toFixed(1) + ' ' + p.y.toFixed(1);
+  }).join(' ') + ' Z';
+  const jc = projectPoint(JEJU.lat, JEJU.lng, size);
+  const je = projectPoint(JEJU.lat - JEJU.위도반경, JEJU.lng + JEJU.경도반경, size);
+
+  const parts = ['<path class="fp-land" d="' + land + '"/>',
+    '<ellipse class="fp-land" cx="' + jc.x.toFixed(1) + '" cy="' + jc.y.toFixed(1)
+    + '" rx="' + (je.x - jc.x).toFixed(1) + '" ry="' + (je.y - jc.y).toFixed(1) + '"/>'];
+
+  fpPinLayout(size).forEach((p) => {
+    const sel = state.fpSelected === p.name;
+    const lx = p.left ? p.x - 9 : p.x + 9;
+    if (Math.abs(p.ly - p.y) > 2) {
+      parts.push('<line class="fp-lead" x1="' + (p.left ? p.x - 4 : p.x + 4).toFixed(1) + '" y1="' + p.y.toFixed(1)
+        + '" x2="' + lx.toFixed(1) + '" y2="' + (p.ly - 3).toFixed(1) + '"/>');
+    }
+    if (near.indexOf(p.name) >= 0) {
+      parts.push('<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1)
+        + '" r="9" fill="rgba(0,104,255,.15)"/>');
+    }
+    parts.push('<circle class="fp-pin' + (sel ? ' sel' : '') + '" cx="' + p.x.toFixed(1)
+      + '" cy="' + p.y.toFixed(1) + '" r="' + (sel ? 6 : 4.5) + '"/>');
+    parts.push('<text class="fp-label' + (sel ? ' sel' : '') + '" x="' + lx.toFixed(1)
+      + '" y="' + (p.ly + 3.5).toFixed(1) + '" text-anchor="' + (p.left ? 'end' : 'start') + '"'
+      + ' data-act="fpSelect" data-v="' + esc(p.name) + '">' + esc(p.short) + '</text>');
+    // 점보다 넓은 투명 원을 위에 얹어 터치로도 고를 수 있게 한다.
+    parts.push('<circle class="fp-hit" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="6"'
+      + ' data-act="fpSelect" data-v="' + esc(p.name) + '"><title>' + esc(p.name) + '</title></circle>');
+  });
+
+  const pad = 12;
+  return '<svg viewBox="' + (-pad) + ' ' + (-pad) + ' ' + (size.w + pad * 2) + ' ' + (size.h + pad * 2) + '"'
+    + ' role="img" aria-label="전국 FP센터 위치 개략도">' + parts.join('') + '</svg>';
+}
+
+function fpCardHtml(c, dist) {
+  const sel = state.fpSelected === c.이름;
+  return '<div class="fp-card' + (sel ? ' sel' : '') + '" data-act="fpSelect" data-v="' + esc(c.이름) + '">'
+    + '<div class="fp-card-top"><span class="fp-name">' + esc(c.이름) + '</span>'
+    + (dist === undefined ? '' : '<span class="fp-dist">' + esc(fpDistText(dist)) + '</span>')
+    + '</div>'
+    + '<div class="fp-addr">' + esc(c.주소) + '</div>'
+    + '<div class="fp-links">'
+    + '<a href="tel:' + esc(c.전화.replace(/-/g, '')) + '">' + esc(c.전화) + '</a>'
+    // 키가 필요 없는 공개 링크. 눌렀을 때만 새 창으로 이동한다.
+    + '<a href="https://map.kakao.com/link/map/' + encodeURIComponent(c.이름) + ',' + c.lat + ',' + c.lng + '"'
+    + ' target="_blank" rel="noopener noreferrer">카카오맵에서 열기</a>'
+    + '</div></div>';
+}
+
+// 위치는 전제가 아니라 향상이다 — 얻지 못해도 전체 목록만으로 화면이 완결된다.
+// 버튼을 눌렀을 때만 요청한다. 진입 즉시 권한 팝업이 뜨면 반사적으로 거부되기 때문이다.
+function fpLocate() {
+  if (!navigator.geolocation) {
+    state.fpMsg = { text: '이 브라우저는 위치 조회를 지원하지 않습니다. 전체 목록에서 확인해 주세요.', kind: 'info' };
+    render();
+    return;
+  }
+  state.fpBusy = true;
+  state.fpMsg = { text: '위치를 확인하는 중입니다…', kind: 'info' };
+  render();
+
+  const done = () => { state.fpBusy = false; if (state.step === STEP_FP) render(); };
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      if (!inKorea(lat, lng)) {
+        state.fpNear = null;
+        state.fpMsg = { text: '현재 위치가 국내가 아닌 것으로 확인됩니다. 전체 목록에서 확인해 주세요.', kind: 'info' };
+      } else {
+        state.fpNear = nearestCenters(lat, lng, CENTERS);
+        state.fpSelected = state.fpNear[0].이름;
+        state.fpMsg = null;
+      }
+      // 좌표는 여기서 수명을 다한다. 어디에도 저장하지 않고 어디로도 보내지 않는다 (원칙 제4조).
+      done();
+    },
+    (err) => {
+      state.fpNear = null;
+      state.fpMsg = err.code === err.PERMISSION_DENIED
+        ? { text: '위치 권한이 거부되었습니다. 허용하면 가까운 순으로 정렬됩니다.', kind: 'info' }
+        : { text: '위치를 확인하지 못했습니다. 전체 목록에서 확인해 주세요.', kind: 'warn' };
+      done();
+    },
+    { timeout: 10000, maximumAge: 0 }
+  );
+}
+
+function renderFp() {
+  const st = fpExpiryStatus(todayIso());
+  const 경고 = st.만료됨
+    ? '준법감시 유효기간이 지났습니다 (' + FP_SOURCE.유효기간.만료 + '). 자료 갱신이 필요합니다.'
+    : (st.경고 ? '준법감시 유효기간이 ' + st.남은일수 + '일 남았습니다 (' + FP_SOURCE.유효기간.만료 + ').' : '');
+
+  const tools = '<div class="fp-tools">'
+    + (navigator.geolocation
+      ? '<button class="fp-btn" data-act="fpLocate"' + (state.fpBusy ? ' disabled' : '') + '>'
+        + (state.fpBusy ? '확인 중…' : '가까운 센터 찾기') + '</button>'
+      : '')
+    + '</div>'
+    + '<div class="fp-cap">현재 위치는 가까운 센터를 계산하는 데만 쓰이며 저장·전송되지 않습니다.</div>'
+    + (state.fpMsg ? '<div class="fp-msg ' + state.fpMsg.kind + '">' + esc(state.fpMsg.text) + '</div>' : '');
+
+  const nearBlock = state.fpNear
+    ? '<div class="block" style="margin-top:22px"><div class="block-label">가까운 센터</div>'
+      + '<div class="fp-list">' + state.fpNear.map((c) => fpCardHtml(c, c.거리km)).join('') + '</div>'
+      + '<div class="fp-cap">직선거리 기준입니다. 실제 이동거리·소요시간과는 다릅니다.</div></div>'
+    : '';
+
+  return '<div class="pane">'
+    + '<div class="eyebrow">FP센터 위치</div>'
+    + '<h1>가까운 FP센터를 확인하세요</h1>'
+    + (경고 ? '<div class="fp-msg warn" style="margin-top:14px">' + esc(경고) + '</div>' : '')
+    + '<div style="height:24px"></div>'
+    + '<div class="fp-top">'
+    + '<div><div class="fp-map">' + fpMapSvg() + '</div>'
+    + '<div class="fp-cap">좌표를 그대로 투영한 개략도입니다. 해안선은 단순화했으며, '
+    + '센터 위치는 실제 위경도입니다. 이름을 누르면 아래 목록에서 함께 표시됩니다.</div></div>'
+    // 전체 목록을 「가까운 센터 찾기」 바로 밑에 둔다 — 위치를 못 얻어도 손에 잡히는 게 목록이다.
+    + '<div>' + tools + nearBlock
+    + '<div class="block" style="margin-top:22px"><div class="block-label">전체 FP센터</div>'
+    + '<div class="fp-list">' + CENTERS.map((c) => fpCardHtml(c)).join('') + '</div></div>'
+    + '</div>'
+    + '</div>'
+    + '<div class="fp-src">출처: 삼성생명 FP센터 안내 · 준법감시필 ' + FP_SOURCE.심의번호
+    + ' (' + FP_SOURCE.담당 + ', ' + FP_SOURCE.유효기간.시작 + '~' + FP_SOURCE.유효기간.만료 + ')<br>'
+    + '주소·전화는 인쇄물 표기를 그대로 옮겼습니다. 지도는 좌표를 직접 투영한 개략도이며, '
+    + '실제 지도는 각 센터의 카카오맵 링크에서 확인합니다.</div>'
+    + '</div>';
+}
+
+// ══════════════════════════ 종합 검토 결과 ══════════════════════════
+
+// 결과값과 함께 어떤 전제로 계산했는지 남긴다. 개산이므로 전제가 곧 결과의 유효 범위다.
+function assumptionLines(r) {
+  const lines = [r.mode === 'simple'
+    ? '간편 모드 — 채무·사전증여·중과 등 세부 항목은 법정 기본 가정값을 적용했습니다.'
+    : '심화 모드 — 위 입력값을 그대로 적용했습니다.'];
+  (r.res.notes || []).forEach((note) => lines.push(note));
+  return lines;
+}
+
+// 카드에서 값이 바뀌면 다시 그려지는 부분. 수정 중에는 입력값 목록을 감춘다 —
+// 바로 아래 수정 패널에 같은 값이 입력란으로 있어 두 번 읽히기 때문이다.
+function summaryLiveHtml(r, editing) {
+  const res = r.res;
+  // 결과 라벨(`예상 상속세 (1차)` 등)은 항목 이름 바로 아래에서 겹쳐 읽히므로 두지 않는다.
+  // 라벨에만 있던 단서는 아래 sub 줄과 「가정」이 그대로 담고 있다.
+  return '<div class="sum-amt">' + esc(W(res.total)) + '</div>'
+    + (res.sub ? '<div class="sum-sub">' + esc(res.sub) + '</div>' : '')
+    + (!editing && r.inputs.length > 0
+      ? '<div class="sum-sec"><div class="sum-h">입력값</div><dl class="sum-kv">'
+        + r.inputs.map((kv) => '<dt>' + esc(kv[0]) + '</dt><dd>' + esc(kv[1]) + '</dd>').join('')
+        + '</dl></div>'
+      : '')
+    + '<div class="sum-sec"><div class="sum-h">가정</div><ul class="sum-notes">'
+    + assumptionLines(r).map((line) => '<li>' + esc(line) + '</li>').join('')
+    + '</ul></div>';
+}
+
+// 검토를 마친 항목만 카드로 만든다. 미검토 항목은 화면 아래 「미검토 항목」에 이름만 모은다 —
+// 빈 카드를 늘어놓으면 실제로 검토한 내용이 그만큼 묻힌다.
+function summaryCardHtml(it) {
+  const num = String(ITEMS.indexOf(it) + 1).padStart(2, '0');
+  const top = (right) => '<div class="sum-top"><span class="item-num">' + num + '</span>'
+    + '<span class="sum-name">' + esc(it.name) + '</span>'
+    + '<span class="sum-right">' + right + '</span></div>';
+  const r = reviewOf(it.key);
+
+  // 한 번에 한 항목만 수정한다. 입력 기계장치(필드 목록·접근자)가 "현재 항목"이라는
+  // 전역 상태를 읽으므로, 여러 항목을 동시에 열면 그 전제가 깨진다.
+  const editing = state.sumEdit === it.key;
+  const editRows = editing
+    ? withSectionFlags(visibleFields()).map((f) => fieldHtml(f, true)).join('')
+    : '';
+
+  return '<div class="sum-card' + (editing ? ' editing' : '') + '">'
+    + top('<span class="tag' + (r.mode === 'simple' ? ' blue' : '') + '">'
+      + (r.mode === 'simple' ? '간편' : '심화') + '</span>'
+      + '<button class="link" data-act="sumEdit" data-v="' + it.key + '">'
+      + (editing ? '접기' : '입력값 수정') + '</button>')
+    + '<div' + (editing ? ' id="sumLive"' : '') + '>' + summaryLiveHtml(r, editing) + '</div>'
+    + (editing
+      ? '<div class="sum-sec"><div class="sum-h">입력값 수정 · 즉시 재계산</div>'
+        + '<div class="edit-panel"><div class="mode-line" style="margin:0">'
+        + '<span style="font-size:13px;color:var(--muted)">'
+        + (state.mode === 'simple' ? '간편' : '심화') + ' 모드 입력값</span>'
+        + '<button class="link" data-act="swapMode">'
+        + (state.mode === 'simple' ? '심화로 바꾸기' : '간편으로 바꾸기') + '</button></div>'
+        + editRows + '</div></div>'
+      : '')
+    + '</div>';
+}
+
+function renderSummary() {
+  const a = age();
+  // 고객을 부를 때는 이름에 「님」을 붙인다.
+  const 고객 = state.customerName ? state.customerName + '님' : '고객';
+  const who = [고객];
+  if (state.sex) who.push(state.sex === 'M' ? '남' : '여');
+  if (a !== null) who.push('만 ' + a + '세');
+
+  return '<div class="pane">'
+    + '<div class="eyebrow">종합 검토 결과</div>'
+    + '<h1>' + esc(state.customerName ? 고객 + '의 예상 세금' : '예상 세금') + '</h1>'
+    + '<div class="sum-meta"><span>' + esc(who.join(' · ')) + '</span>'
+    + '<span>검토 완료 ' + state.done.length + ' / ' + ITEMS.length + '</span>'
+    + '<span>세법 기준일자 ' + BASIS_DATE + '</span>'
+    + '<button class="link no-print" data-act="print" title="전문가 검토용으로 인쇄하거나 PDF로 저장합니다">인쇄 · PDF 저장</button>'
+    + '</div>'
+    + staleWarnHtml()
+    + '<div class="sum-list">'
+    + ITEMS.filter((it) => state.done.indexOf(it.key) >= 0).map(summaryCardHtml).join('')
+    + '</div>'
+    // FR-06 — 결과를 보여주는 화면에는 개산 고지를 함께 노출한다.
+    + '<div class="notice" style="margin-top:22px"><span class="notice-mark">!</span>'
+    + '<span class="notice-text">참고용 <b>개산</b>입니다. 확정 세액은 전문가 검토가 필요합니다. '
+    + '기준일자 ' + BASIS_DATE + '</span></div>'
+    + (state.done.length < ITEMS.length
+      ? '<div class="block" style="margin-top:30px"><div class="block-label">미검토 항목</div>'
+        + '<div class="stack tight">'
+        + ITEMS.filter((it) => state.done.indexOf(it.key) < 0).map((it) =>
+          '<button class="next-item" data-act="item" data-v="' + it.key + '">'
+          + '<span class="item-num">' + String(ITEMS.indexOf(it) + 1).padStart(2, '0') + '</span>'
+          + '<span class="item-body"><span class="item-name">' + esc(it.name) + '</span>'
+          + '<span class="item-desc">' + esc(it.desc) + '</span></span>'
+          + '<span class="arrow">→</span></button>').join('')
+        + '</div></div>'
+      : '')
+    + '</div>';
+}
+
+function render() {
+  renderHeader();
+  const main = document.getElementById('main');
+  if (state.step === STEP_START) main.innerHTML = renderStart();
+  else if (state.step === 1) main.innerHTML = renderStep1();
+  else if (state.step === 2) main.innerHTML = renderStep2();
+  else if (state.step === 3) main.innerHTML = renderStep3();
+  else if (state.step === 4) main.innerHTML = renderStep4();
+  else if (state.step === 5) main.innerHTML = renderStep5();
+  else if (state.step === STEP_SUMMARY) main.innerHTML = renderSummary();
+  else main.innerHTML = renderFp();
+
+  const cta = ctaFor();
+  const prev = prevFor();
+  // 결과·종합·FP 화면은 「다음」이 없지만 「이전」은 있으므로, 둘 중 하나만 있어도 바를 띄운다.
+  const showBar = !!(cta || prev);
+  main.classList.toggle('no-cta', !showBar);
+  main.classList.toggle('start', state.step === STEP_START);
+  document.getElementById('ctaBar').style.display = showBar ? 'flex' : 'none';
+  document.getElementById('ctaIn').innerHTML =
+    (prev ? '<button class="cta cta-prev" data-act="prev">이전</button>' : '')
+    + (cta
+      ? '<button class="cta" data-act="next"' + (cta.ok ? '' : ' disabled') + '>' + esc(cta.label) + '</button>'
+      : '');
+}
+
+// 입력 중에는 입력 필드를 다시 그리지 않는다 (포커스·커서 위치 보존).
+// 파생 표시 영역만 갱신한다.
+function refreshDerived() {
+  const cta = ctaFor();
+  // 「이전」도 .cta 클래스를 쓰므로 역할로 집어야 한다 — 클래스로 고르면 이전 버튼이 잡힌다.
+  const btn = document.querySelector('[data-act=next]');
+  if (cta && btn) {
+    btn.textContent = cta.label;
+    btn.disabled = !cta.ok;
+  }
+  if (state.step === 1) {
+    const a = age();
+    const el = document.getElementById('ageText');
+    if (el) el.textContent = a === null ? '—' : a + '세';
+    // 고객명·생년월일을 고치는 즉시 경고가 나타나거나 사라져야 한다.
+    // 이 화면은 입력 중 재렌더하지 않으므로(포커스 보존) 여기서 직접 갱신한다.
+    const warn = document.getElementById('staleWarn');
+    if (warn) warn.innerHTML = staleWarnHtml();
+  }
+  if (state.step === 5) {
+    const area = document.getElementById('resultArea');
+    if (area) area.innerHTML = resultHtml();
+  }
+  // 종합 결과에서 펼쳐 고치는 중인 카드만 다시 계산한다. 나머지 카드는 손대지 않는다.
+  if (state.step === STEP_SUMMARY && state.sumEdit) {
+    const box = document.getElementById('sumLive');
+    const r = reviewOf(state.sumEdit);
+    if (box && r) box.innerHTML = summaryLiveHtml(r, true);
+  }
+  // 입력값에 연동되는 표시(힌트·만 나이·자동 조회값)를 다시 계산해 갱신한다.
+  if (state.item && (state.step === 4 || state.step === 5
+      || (state.step === STEP_SUMMARY && state.sumEdit))) {
+    const fields = allFields();
+    const g = accessor();
+    document.querySelectorAll('[data-hint]').forEach((box) => {
+      const f = fields.find((x) => x.k === box.dataset.hint);
+      if (f && typeof f.hint === 'function') box.innerHTML = hintHtml(f);
+    });
+    document.querySelectorAll('[data-derived]').forEach((box) => {
+      const f = fields.find((x) => x.k === box.dataset.derived);
+      box.textContent = f && typeof f.derive === 'function' ? f.derive(state.vals[f.k] || '') : '';
+    });
+    document.querySelectorAll('[data-derived-input]').forEach((box) => {
+      const f = fields.find((x) => x.k === box.dataset.derivedInput);
+      if (f && typeof f.value === 'function') box.value = f.value(g);
+    });
+    // 선택지의 활성 상태가 숫자 입력에 딸린 경우가 있다 (주택 수 → 해당 주택 거주).
+    // 숫자 입력은 포커스 보존을 위해 재렌더를 하지 않으므로 여기서 버튼만 다시 그린다.
+    document.querySelectorAll('[data-opts]').forEach((box) => {
+      const f = fields.find((x) => x.k === box.dataset.opts);
+      if (f && typeof f.disabledOpts === 'function') box.innerHTML = optsHtml(f, g);
+    });
+  }
+}
+
+// ══════════════════════════ 이벤트 ══════════════════════════
+
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-act]');
+  if (!el || el.disabled) return;
+  const act = el.dataset.act;
+
+  if (act === 'prev') { const p = prevFor(); if (p) go(p.to); return; }
+  // 전문가 검토에 넘길 출력물. 저장소·전송을 쓰지 않으므로(제4조) 화면을 닫으면 결과가
+  // 사라지는데, 그러면 검토를 부탁할 수단이 없다. 인쇄는 사용자가 직접 누르는 출력이므로
+  // 제4조의 「저장·전송하지 않는다」와 충돌하지 않는다.
+  if (act === 'print') { window.print(); return; }
+  if (act === 'startTax') { go(1); return; }
+  if (act === 'gotoStart') { go(STEP_START); return; }
+  // 새 고객을 마주할 때 이전 상담 내용이 남아 있으면 안 된다.
+  // 첫 클릭은 확인 상태로만 바꾸고, 두 번째 클릭에서 실제로 지운다.
+  if (act === 'resetAll') {
+    if (!state.resetArmed) { state.resetArmed = true; render(); return; }
+    resetAll();
+    return;
+  }
+  if (act === 'startFp') { state.back = STEP_START; go(STEP_FP); return; }
+  if (act === 'gotoSummary' || act === 'gotoFp') {
+    // 두 화면 사이를 오갈 때 돌아갈 곳이 서로를 가리키면 [←]가 맴돈다.
+    if (state.step !== STEP_SUMMARY && state.step !== STEP_FP) state.back = state.step;
+    go(act === 'gotoSummary' ? STEP_SUMMARY : STEP_FP);
+    return;
+  }
+  if (act === 'fpSelect') {
+    // 카드 안의 전화·카카오맵 링크를 눌렀을 때는 이동만 한다.
+    // 여기서 다시 그리면 링크가 DOM에서 사라져 이동이 취소될 수 있다.
+    if (e.target.closest('a')) return;
+    state.fpSelected = el.dataset.v;
+    render();
+    return;
+  }
+  if (act === 'fpLocate') { fpLocate(); return; }
+  if (act === 'next') { const c = ctaFor(); if (c && c.ok) c.act(); return; }
+  if (act === 'sex') { state.sex = el.dataset.v; render(); return; }
+  // 검토 모드는 선택 즉시 다음 단계로 넘어간다. 뒤로 돌아온 경우에는 하단 CTA로 다시 진행한다.
+  if (act === 'mode') { state.mode = el.dataset.v; go(3); return; }
+  if (act === 'swapMode') {
+    state.mode = state.mode === 'simple' ? 'deep' : 'simple';
+    if (editingSaved()) saveCurrent();   // 결과 화면에서 모드를 바꾸면 종합 결과도 같은 모드로 따라간다
+    render();
+    return;
+  }
+  if (act === 'toggleEdit') { state.openEdit = !state.openEdit; render(); return; }
+  // 종합 결과에서 항목 하나를 펼쳐 고친다. 입력 기계장치가 전역 상태를 읽으므로
+  // 펼치는 순간 그 항목의 스냅샷을 현재 상태로 올려놓는다.
+  if (act === 'sumEdit') {
+    const key = el.dataset.v;
+    if (state.sumEdit === key) {
+      state.sumEdit = '';
+    } else {
+      state.sumEdit = key;
+      state.item = key;
+      state.vals = Object.assign({}, state.saved[key] || {});
+      state.mode = state.savedMode[key] || state.mode;
+    }
+    render();
+    return;
+  }
+  if (act === 'choice') { state.vals[el.dataset.k] = el.dataset.v; render(); return; }
+  if (act === 'item') {
+    const key = el.dataset.v;
+    openItem(key, state.done.indexOf(key) >= 0);
+  }
+});
+
+// FR-05 — 숫자 필드는 숫자 이외의 입력을 받지 않는다. 음수·비수치는 구조적으로 불가능하다.
+document.addEventListener('input', (e) => {
+  const el = e.target.closest('[data-inp]');
+  if (!el) return;
+  const kind = el.dataset.inp;
+
+  if (kind === 'customerName') { state.customerName = el.value; refreshDerived(); return; }
+  if (kind === 'birth') {
+    const digits = el.value.replace(/\D/g, '').slice(0, 8);
+    if (el.value !== digits) el.value = digits;
+    state.birth = digits;
+    refreshDerived();
+    return;
+  }
+  // 날짜 입력 — 숫자 8자리만 받고, 같은 줄의 파생 표시를 갱신한다.
+  if (kind === 'dateval') {
+    const key = el.dataset.k;
+    const digits = el.value.replace(/\D/g, '').slice(0, 8);
+    if (el.value !== digits) el.value = digits;
+    state.vals[key] = digits;
+
+    let message = digits.length === 8 && parseDate(digits) === null
+      ? '날짜 형식이 올바르지 않습니다. YYYYMMDD로 입력하세요.' : '';
+    // 상속개시일보다 늦게 태어난 자녀는 나이를 산정할 수 없다.
+    if (!message && digits.length === 8 && key.indexOf('childBirth') === 0
+        && ageFromBirth(digits, inheritRefDate()) === null) {
+      message = '상속개시일보다 늦은 생년월일입니다. 두 날짜를 확인하세요.';
+    }
+    setFieldError(key, el, message);
+    if (editingSaved()) saveCurrent();
+
+    // 기준일(상속개시일·증여일)이 바뀌면 다른 필드의 나이·조회값도 함께 갱신된다.
+    // refreshDerived가 모든 파생 표시를 다시 계산하므로 재렌더는 필요 없다.
+    refreshDerived();
+    return;
+  }
+
+  if (kind === 'val') {
+    const key = el.dataset.k;
+    const typed = el.value;
+    // 천단위 구분기호·공백은 서식으로 보아 제거한다.
+    const digits = typed.replace(/[,\s]/g, '');
+    // 부호·소수점·문자는 거부한다. 해당 문자만 지우면 값이 조용히 왜곡되므로
+    // (-50000 → 50000, 12.5 → 125) 입력 자체를 되돌리고 사유를 표시한다.
+    if (!/^[0-9]*$/.test(digits)) {
+      const prev = state.vals[key] === undefined ? '' : state.vals[key];
+      el.value = withCommas(prev);
+      setFieldError(key, el, '0 이상의 정수만 입력할 수 있습니다. 음수·소수점·문자는 사용할 수 없습니다.');
+      return;
+    }
+    setFieldError(key, el, '');
+    state.vals[key] = digits;
+
+    // 자녀 수는 필드 목록 자체를 바꾸므로 다시 그린 뒤 커서를 되돌린다.
+    if (state.item === 'inherit' && key === 'children') {
+      if (editingSaved()) saveCurrent();
+      render();
+      const again = document.querySelector('[data-inp=val][data-k=children]');
+      if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
+      return;
+    }
+
+    // 콤마를 다시 붙이면 문자열 길이가 바뀌므로, 커서 앞의 "숫자 개수"를 기준으로 위치를 복원한다.
+    const digitsBeforeCaret = typed.slice(0, el.selectionStart).replace(/[^0-9]/g, '').length;
+    const formatted = withCommas(digits);
+    if (el.value !== formatted) {
+      el.value = formatted;
+      let pos = 0, seen = 0;
+      while (pos < formatted.length && seen < digitsBeforeCaret) {
+        if (formatted[pos] >= '0' && formatted[pos] <= '9') seen += 1;
+        pos += 1;
+      }
+      el.setSelectionRange(pos, pos);
+    }
+
+    if (editingSaved()) saveCurrent();
+    refreshDerived();
+  }
+});
+
+function setFieldError(key, el, message) {
+  el.classList.toggle('invalid', !!message);
+  document.querySelectorAll('[data-err="' + key + '"]').forEach((box) => { box.textContent = message; });
+}
+
+render();
+</script>
+</body>
+</html>

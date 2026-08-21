@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>상속세 계산기</title>
+<style>
+  body { font-family: -apple-system, "Malgun Gothic", sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; color: #1a1a1a; }
+  h1 { font-size: 22px; }
+  label { display: block; margin-top: 14px; font-size: 14px; font-weight: 600; }
+  input[type="number"] { width: 100%; padding: 8px; font-size: 15px; box-sizing: border-box; margin-top: 4px; }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+  .checkbox-row label { margin: 0; }
+  button { margin-top: 20px; padding: 10px 20px; font-size: 15px; cursor: pointer; }
+  #result { margin-top: 24px; padding: 16px; border: 1px solid #ddd; border-radius: 8px; display: none; }
+  #result table { width: 100%; border-collapse: collapse; }
+  #result td { padding: 6px 0; font-size: 14px; }
+  #result td.value { text-align: right; }
+  #result .final-row td { font-weight: 700; font-size: 17px; border-top: 1px solid #ccc; padding-top: 10px; }
+  .error { color: #c0392b; margin-top: 12px; font-size: 14px; }
+</style>
+</head>
+<body>
+  <h1>상속세 계산기 (간단 모드)</h1>
+
+  <label for="realEstate">부동산가액 (만원)</label>
+  <input type="number" id="realEstate" min="0" value="0">
+
+  <label for="cash">현금(금융자산)가액 (만원)</label>
+  <input type="number" id="cash" min="0" value="0">
+
+  <label for="other">기타자산가액 (만원)</label>
+  <input type="number" id="other" min="0" value="0">
+
+  <div class="checkbox-row">
+    <input type="checkbox" id="hasSpouse">
+    <label for="hasSpouse">배우자 있음</label>
+  </div>
+
+  <label for="numChildren">자녀 수</label>
+  <input type="number" id="numChildren" min="0" value="0">
+
+  <div class="checkbox-row">
+    <input type="checkbox" id="detailedMode">
+    <label for="detailedMode">상세 모드 (세무사/FC용)</label>
+  </div>
+
+  <div id="detailedFields" style="display: none;">
+    <label for="debt">채무 (만원)</label>
+    <input type="number" id="debt" min="0" value="0">
+
+    <label for="financialDebt">금융채무 (만원, 순금융재산 계산용)</label>
+    <input type="number" id="financialDebt" min="0" value="0">
+
+    <label for="funeralCost">장례비용 (만원)</label>
+    <input type="number" id="funeralCost" min="0" value="0">
+
+    <label for="priorGift">사전증여재산 (만원)</label>
+    <input type="number" id="priorGift" min="0" value="0">
+
+    <label for="actualSpouseShare">배우자 실제 상속액 (만원, 비워두면 법정상속분으로 계산)</label>
+    <input type="number" id="actualSpouseShare" min="0" placeholder="법정상속분 자동 계산">
+
+    <label for="minorYearsTotal">미성년자 잔여연수 합계</label>
+    <input type="number" id="minorYearsTotal" min="0" value="0">
+
+    <label for="numElderly">65세 이상 연로자 수</label>
+    <input type="number" id="numElderly" min="0" value="0">
+
+    <label for="disabledYearsTotal">장애인 기대여명 합계</label>
+    <input type="number" id="disabledYearsTotal" min="0" value="0">
+  </div>
+
+  <button id="calcBtn">계산하기</button>
+
+  <div class="error" id="errorBox"></div>
+
+  <div id="result">
+    <table>
+      <tr><td>총 상속재산가액</td><td class="value" id="rTotalEstate"></td></tr>
+      <tr><td>과세표준</td><td class="value" id="rTaxBase"></td></tr>
+      <tr><td>산출세액</td><td class="value" id="rCalculatedTax"></td></tr>
+      <tr><td>신고세액공제(3%)</td><td class="value" id="rReportDeduction"></td></tr>
+      <tr class="final-row"><td>최종 납부세액</td><td class="value" id="rFinalTax"></td></tr>
+    </table>
+    <div style="font-size: 12px; color: #666; margin-top: 12px;">
+      ※ 본 계산 결과는 참고용 개산 세액이며, 정확한 세액은 반드시 세무 전문가 상담 및 국세청·법제처 최신 법령을 통해 확인하시기 바랍니다.
+    </div>
+  </div>
+
+  <script src="calc.js"></script>
+  <script>
+    function formatWon(n) {
+      const rounded = Math.round(n);
+      const sign = rounded < 0 ? '-' : '';
+      const abs = Math.abs(rounded);
+      let eok = Math.floor(abs / 100000000);
+      let manWon = Math.round((abs % 100000000) / 10000);
+      if (manWon >= 10000) {
+        eok += 1;
+        manWon -= 10000;
+      }
+      if (eok > 0 && manWon > 0) {
+        return `${sign}${eok.toLocaleString('ko-KR')}억 ${manWon.toLocaleString('ko-KR')}만원`;
+      }
+      if (eok > 0) {
+        return `${sign}${eok.toLocaleString('ko-KR')}억원`;
+      }
+      return `${sign}${manWon.toLocaleString('ko-KR')}만원`;
+    }
+
+    document.getElementById('detailedMode').addEventListener('change', (e) => {
+      document.getElementById('detailedFields').style.display = e.target.checked ? 'block' : 'none';
+    });
+
+    document.getElementById('calcBtn').addEventListener('click', () => {
+      const errorBox = document.getElementById('errorBox');
+      errorBox.textContent = '';
+
+      const realEstateManwon = Number(document.getElementById('realEstate').value);
+      const cashManwon = Number(document.getElementById('cash').value);
+      const otherManwon = Number(document.getElementById('other').value);
+      const hasSpouse = document.getElementById('hasSpouse').checked;
+      const numChildren = Number(document.getElementById('numChildren').value);
+
+      if ([realEstateManwon, cashManwon, otherManwon, numChildren].some((v) => Number.isNaN(v) || v < 0)) {
+        errorBox.textContent = '자산가액과 자녀 수는 0 이상의 숫자여야 합니다.';
+        document.getElementById('result').style.display = 'none';
+        return;
+      }
+
+      const MANWON = 10000;
+      const realEstate = realEstateManwon * MANWON;
+      const cash = cashManwon * MANWON;
+      const other = otherManwon * MANWON;
+
+      const isDetailed = document.getElementById('detailedMode').checked;
+      const extra = isDetailed ? {
+        debt: (Number(document.getElementById('debt').value) || 0) * MANWON,
+        financialDebt: (Number(document.getElementById('financialDebt').value) || 0) * MANWON,
+        funeralCost: (Number(document.getElementById('funeralCost').value) || 0) * MANWON,
+        priorGift: (Number(document.getElementById('priorGift').value) || 0) * MANWON,
+        actualSpouseShare: document.getElementById('actualSpouseShare').value === ''
+          ? null
+          : Number(document.getElementById('actualSpouseShare').value) * MANWON,
+        minorYearsTotal: Number(document.getElementById('minorYearsTotal').value) || 0,
+        numElderly: Number(document.getElementById('numElderly').value) || 0,
+        disabledYearsTotal: Number(document.getElementById('disabledYearsTotal').value) || 0,
+      } : {};
+
+      // Validate detailed-mode fields for negative values
+      if (isDetailed) {
+        const detailedValues = [
+          extra.debt, extra.financialDebt, extra.funeralCost, extra.priorGift,
+          extra.minorYearsTotal, extra.numElderly, extra.disabledYearsTotal
+        ];
+        if (detailedValues.some((v) => v < 0)) {
+          errorBox.textContent = '상세 항목의 값은 0 이상의 숫자여야 합니다.';
+          document.getElementById('result').style.display = 'none';
+          return;
+        }
+        if (extra.actualSpouseShare !== null && extra.actualSpouseShare < 0) {
+          errorBox.textContent = '배우자 실제 상속액은 0 이상의 숫자여야 합니다.';
+          document.getElementById('result').style.display = 'none';
+          return;
+        }
+      }
+
+      const result = calculateInheritanceTax({ realEstate, cash, other, hasSpouse, numChildren, ...extra });
+
+      document.getElementById('rTotalEstate').textContent = formatWon(result.totalEstate);
+      document.getElementById('rTaxBase').textContent = formatWon(result.taxBase);
+      document.getElementById('rCalculatedTax').textContent = formatWon(result.calculatedTax);
+      document.getElementById('rReportDeduction').textContent = formatWon(result.reportDeduction);
+      document.getElementById('rFinalTax').textContent = formatWon(result.finalTax);
+      document.getElementById('result').style.display = 'block';
+    });
+  </script>
+</body>
+</html>

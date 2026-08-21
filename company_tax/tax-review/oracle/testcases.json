@@ -1,0 +1,228 @@
+{
+  "meta": {
+    "name": "상속세 계산 검증 기준 (test oracle)",
+    "version": "1.0",
+    "createdAt": "2026-08-19",
+    "purpose": "언어 중립 검증 기준. JS 구현(calc.js)과 향후 Python 포팅 구현이 동일한 기대값을 만족하는지 대조하는 데 사용한다 (작업 T-309, 요구사항 NFR-16).",
+    "provenance": "기대값은 상속세및증여세법 산식으로 직접 도출한 값이며, calc.test.js의 단언에서 그대로 전사(轉寫)했다. 구현을 실행해 얻은 값이 아니다 (프로젝트 원칙 제3조).",
+    "amountUnit": "원 (KRW)",
+    "totalCases": 26
+  },
+
+  "calculateProgressiveTax": [
+    {
+      "name": "과세표준 0 이하는 0원",
+      "inputs": [0, -1000],
+      "expected": 0
+    },
+    {
+      "name": "1억원 이하 10% 구간",
+      "input": 50000000,
+      "expected": 5000000
+    },
+    {
+      "name": "1억초과 5억이하 20% 구간",
+      "input": 300000000,
+      "expected": 50000000
+    },
+    {
+      "name": "5억초과 10억이하 30% 구간",
+      "input": 700000000,
+      "expected": 150000000
+    },
+    {
+      "name": "10억초과 30억이하 40% 구간",
+      "input": 2000000000,
+      "expected": 640000000
+    },
+    {
+      "name": "30억초과 50% 구간",
+      "input": 5000000000,
+      "expected": 2040000000
+    }
+  ],
+
+  "calculateStandardDeduction": [
+    {
+      "name": "자녀 2명, 일괄공제(5억)가 더 큼",
+      "input": { "numChildren": 2 },
+      "expected": 500000000
+    },
+    {
+      "name": "자녀 8명, 인적공제 합계가 일괄공제보다 큼",
+      "input": { "numChildren": 8 },
+      "expected": 600000000,
+      "derivation": "기초공제 2억 + 자녀 8명 × 5천만 = 6억"
+    },
+    {
+      "name": "배우자 단독상속인은 일괄공제 불가",
+      "input": { "numChildren": 0, "isSpouseSoleHeir": true },
+      "expected": 200000000,
+      "derivation": "기초공제 2억만. 일괄공제 5억보다 작아도 단독상속인은 일괄공제 적용 불가"
+    },
+    {
+      "name": "미성년자공제가 반영되어 인적공제 합계가 일괄공제를 넘음",
+      "input": { "numChildren": 3, "minorYearsTotal": 20 },
+      "expected": 550000000,
+      "derivation": "2억 + 3×5천만(1.5억) + 20×1천만(2억) = 5.5억"
+    }
+  ],
+
+  "calculateSpouseDeduction": [
+    {
+      "name": "배우자 없으면 0",
+      "input": { "hasSpouse": false, "netEstate": 2000000000, "numChildren": 2 },
+      "expected": 0
+    },
+    {
+      "name": "배우자+자녀2명, 법정상속분(3/7) 적용",
+      "input": { "hasSpouse": true, "netEstate": 2000000000, "numChildren": 2, "actualSpouseShare": null },
+      "expected": 857142857.142857,
+      "tolerance": 0.001,
+      "derivation": "2,000,000,000 × 1.5/(1.5+2) = 2,000,000,000 × 3/7 (무한소수이므로 허용오차 적용)"
+    },
+    {
+      "name": "법정상속분이 5억 미만이면 5억으로 floor",
+      "input": { "hasSpouse": true, "netEstate": 600000000, "numChildren": 5, "actualSpouseShare": null },
+      "expected": 500000000
+    },
+    {
+      "name": "법정상속분이 30억 넘으면 30억으로 cap",
+      "input": { "hasSpouse": true, "netEstate": 10000000000, "numChildren": 1, "actualSpouseShare": null },
+      "expected": 3000000000
+    },
+    {
+      "name": "배우자 실제 상속액을 직접 입력하면 그 값 기준(법정상속분 상한 내)",
+      "input": { "hasSpouse": true, "netEstate": 2000000000, "numChildren": 2, "actualSpouseShare": 600000000 },
+      "expected": 600000000,
+      "derivation": "실제 상속액 6억이 법정상속분 약 8.57억보다 작으므로 그대로 인정"
+    }
+  ],
+
+  "calculateFinancialAssetDeduction": [
+    {
+      "name": "순금융재산 2억, 20%가 2천만 이상",
+      "input": { "cash": 200000000 },
+      "expected": 40000000
+    },
+    {
+      "name": "순금융재산 5천만, 20%가 2천만 미만이면 2천만 한도로 전액",
+      "input": { "cash": 50000000 },
+      "expected": 20000000
+    },
+    {
+      "name": "순금융재산 1천만, 2천만 한도 내 전액",
+      "input": { "cash": 10000000 },
+      "expected": 10000000
+    },
+    {
+      "name": "순금융재산 30억, 2억으로 cap",
+      "input": { "cash": 3000000000 },
+      "expected": 200000000
+    },
+    {
+      "name": "금융채무 차감",
+      "input": { "cash": 300000000, "financialDebt": 100000000 },
+      "expected": 40000000,
+      "derivation": "순금융재산 2억 기준 20% = 4천만"
+    }
+  ],
+
+  "calculateInheritanceTax": [
+    {
+      "name": "스펙 시나리오1 - 배우자+자녀2명, 부동산18억+현금2억",
+      "input": {
+        "realEstate": 1800000000,
+        "cash": 200000000,
+        "hasSpouse": true,
+        "numChildren": 2
+      },
+      "expected": {
+        "totalEstate": 2000000000,
+        "taxBase": 602857143,
+        "calculatedTax": 120857143,
+        "finalTax": 117231429,
+        "breakdown.standardDeduction": 500000000,
+        "breakdown.financialDeduction": 40000000
+      }
+    },
+    {
+      "name": "시나리오A - 배우자 없이 자녀2명, 부동산10억",
+      "input": {
+        "realEstate": 1000000000,
+        "cash": 0,
+        "hasSpouse": false,
+        "numChildren": 2
+      },
+      "expected": {
+        "taxBase": 500000000,
+        "calculatedTax": 90000000,
+        "finalTax": 87300000
+      }
+    },
+    {
+      "name": "시나리오B - 금융재산공제 2억 cap 적용",
+      "input": {
+        "realEstate": 0,
+        "cash": 3000000000,
+        "hasSpouse": false,
+        "numChildren": 1
+      },
+      "expected": {
+        "breakdown.financialDeduction": 200000000,
+        "taxBase": 2300000000,
+        "finalTax": 737200000
+      }
+    },
+    {
+      "name": "시나리오C - 배우자 단독상속(자녀 없음), 공제가 재산을 초과하면 세액 0",
+      "input": {
+        "realEstate": 1000000000,
+        "cash": 0,
+        "hasSpouse": true,
+        "numChildren": 0
+      },
+      "expected": {
+        "breakdown.standardDeduction": 200000000,
+        "taxBase": 0,
+        "finalTax": 0
+      },
+      "derivation": "단독상속이라 일괄공제 불가"
+    },
+    {
+      "name": "시나리오D - 미성년자공제가 결과에 반영됨",
+      "input": {
+        "realEstate": 1500000000,
+        "cash": 0,
+        "hasSpouse": true,
+        "numChildren": 2,
+        "minorYearsTotal": 25
+      },
+      "expected": {
+        "breakdown.standardDeduction": 550000000,
+        "taxBase": 307142857,
+        "finalTax": 49885714
+      },
+      "derivation": "인적공제 합계가 일괄공제(5억)보다 큼"
+    },
+    {
+      "name": "시나리오E - 채무·장례비용·사전증여재산이 과세가액에 반영됨",
+      "input": {
+        "realEstate": 1000000000,
+        "cash": 0,
+        "hasSpouse": false,
+        "numChildren": 1,
+        "debt": 100000000,
+        "funeralCost": 10000000,
+        "priorGift": 50000000
+      },
+      "expected": {
+        "taxableValue": 940000000,
+        "taxBase": 440000000,
+        "calculatedTax": 78000000,
+        "finalTax": 75660000
+      },
+      "derivation": "과세가액 = 10억 − 채무1억 − 장례비1천만 + 사전증여5천만. 과세표준 = 940,000,000 − 일괄공제 5억"
+    }
+  ]
+}

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>가까운 FP센터 찾기</title>
+<style>
+  body { font-family: system-ui, -apple-system, sans-serif; margin: 0 auto; padding: 20px;
+         max-width: 640px; color: #222; line-height: 1.5; }
+  h1 { font-size: 20px; margin: 0 0 16px; }
+  h2 { font-size: 15px; color: #666; margin: 24px 0 8px; font-weight: 600; }
+  button { padding: 10px 18px; font: inherit; cursor: pointer; border: 1px solid #1428A0;
+           background: #1428A0; color: #fff; border-radius: 6px; }
+  button:disabled { opacity: .5; cursor: default; }
+  .notice { font-size: 12px; color: #666; margin-top: 8px; }
+  .msg { margin: 12px 0; padding: 10px 12px; border-radius: 6px; font-size: 14px; }
+  .msg-info { background: #eef2fb; }
+  .msg-warn { background: #fff6e5; }
+  .msg-err  { background: #fdeeee; }
+  ul { list-style: none; padding: 0; margin: 0; }
+  li { border: 1px solid #e2e2e2; border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; }
+  li.near { border-color: #1428A0; }
+  .name { font-weight: 700; }
+  .dist { color: #1428A0; font-weight: 700; margin-left: 6px; }
+  .addr { font-size: 13px; color: #555; margin: 4px 0; }
+  .links a { font-size: 13px; margin-right: 12px; color: #1428A0; }
+  footer { margin-top: 32px; font-size: 12px; color: #888; border-top: 1px solid #eee; padding-top: 12px; }
+</style>
+</head>
+<body>
+
+<h1>가까운 FP센터 찾기</h1>
+
+<button id="find">가까운 센터 찾기</button>
+<p class="notice">현재 위치는 가까운 센터를 계산하는 데만 쓰이며 저장·전송되지 않습니다.</p>
+
+<div id="expiry"></div>
+<div id="message"></div>
+
+<div id="nearBlock" hidden>
+  <h2>가까운 센터</h2>
+  <ul id="nearList"></ul>
+</div>
+
+<h2>전체 FP센터</h2>
+<ul id="allList"></ul>
+
+<footer id="source"></footer>
+
+<script src="centers.js"></script>
+<script src="nearest.js"></script>
+<script>
+'use strict';
+
+const $ = id => document.getElementById(id);
+
+function 거리표기(km) {
+  return km < 1 ? '1km 이내' : km.toFixed(1) + 'km';
+}
+
+// 사용자 입력이 아닌 상수 데이터만 다루지만, textContent로 넣어 HTML 주입 경로를 원천 차단한다.
+function 항목(center, 거리km) {
+  const li = document.createElement('li');
+
+  const 제목 = document.createElement('div');
+  const 이름 = document.createElement('span');
+  이름.className = 'name';
+  이름.textContent = center.이름;
+  제목.appendChild(이름);
+
+  if (거리km !== undefined) {
+    li.className = 'near';
+    const d = document.createElement('span');
+    d.className = 'dist';
+    d.textContent = 거리표기(거리km);
+    제목.appendChild(d);
+  }
+
+  const 주소 = document.createElement('div');
+  주소.className = 'addr';
+  주소.textContent = center.주소;
+
+  const 링크 = document.createElement('div');
+  링크.className = 'links';
+
+  const tel = document.createElement('a');
+  tel.href = 'tel:' + center.전화.replace(/-/g, '');
+  tel.textContent = center.전화;
+
+  const map = document.createElement('a');
+  map.href = 'https://map.kakao.com/link/map/'
+    + encodeURIComponent(center.이름) + ',' + center.lat + ',' + center.lng;
+  map.target = '_blank';
+  map.rel = 'noopener';
+  map.textContent = '카카오맵에서 보기';
+
+  링크.append(tel, map);
+  li.append(제목, 주소, 링크);
+  return li;
+}
+
+function 안내(문구, 종류) {
+  $('message').textContent = '';
+  if (!문구) return;
+  const div = document.createElement('div');
+  div.className = 'msg msg-' + 종류;
+  div.textContent = 문구;
+  $('message').appendChild(div);
+}
+
+// --- 초기 렌더: 위치 없이도 완결된 화면 ---
+CENTERS.forEach(c => $('allList').appendChild(항목(c)));
+
+$('source').textContent =
+  '출처: 삼성생명 FP센터 안내 · 준법감시필 ' + SOURCE.심의번호
+  + '(' + SOURCE.담당 + ', ' + SOURCE.유효기간.시작 + '~' + SOURCE.유효기간.만료 + ')';
+
+// --- 준법감시 유효기간 ---
+(function 유효기간표시() {
+  const 오늘 = new Date().toISOString().slice(0, 10);
+  const s = expiryStatus(오늘);
+  if (!s.경고 && !s.만료됨) return;
+  const div = document.createElement('div');
+  div.className = 'msg msg-warn';
+  div.textContent = s.만료됨
+    ? '준법감시 유효기간이 지났습니다 (' + SOURCE.유효기간.만료 + '). 자료 갱신이 필요합니다.'
+    : '준법감시 유효기간이 ' + s.남은일수 + '일 남았습니다 (' + SOURCE.유효기간.만료 + ').';
+  $('expiry').appendChild(div);
+})();
+
+// --- 위치 기반 조회 ---
+if (!navigator.geolocation) {
+  $('find').hidden = true;
+  안내('이 브라우저는 위치 조회를 지원하지 않습니다. 전체 목록에서 확인해 주세요.', 'info');
+}
+
+$('find').addEventListener('click', () => {
+  $('find').disabled = true;
+  안내('위치를 확인하는 중입니다…', 'info');
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      $('find').disabled = false;
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+
+      // 대한민국 본토 범위를 벗어나면 거리 정렬이 의미가 없다.
+      if (lat < 33 || lat > 39 || lng < 124 || lng > 132) {
+        $('nearBlock').hidden = true;
+        안내('현재 위치가 국내가 아닌 것으로 확인됩니다. 전체 목록에서 확인해 주세요.', 'info');
+        return;
+      }
+
+      const 결과 = nearest(lat, lng, CENTERS);
+      $('nearList').textContent = '';
+      결과.forEach(c => $('nearList').appendChild(항목(c, c.거리km)));
+      $('nearBlock').hidden = false;
+      안내('', null);
+      // 좌표는 여기서 수명을 다한다. 저장하지도, 전송하지도 않는다.
+    },
+    err => {
+      $('find').disabled = false;
+      $('nearBlock').hidden = true;
+      const 거부됨 = err.code === err.PERMISSION_DENIED;
+      안내(
+        거부됨
+          ? '위치 권한이 거부되었습니다. 위치를 허용하면 가까운 순으로 정렬됩니다.'
+          : '위치를 확인하지 못했습니다. 전체 목록에서 확인해 주세요.',
+        거부됨 ? 'info' : 'err'
+      );
+    },
+    { timeout: 10000, maximumAge: 0 }
+  );
+});
+</script>
+
+</body>
+</html>
