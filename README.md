@@ -72,10 +72,27 @@ node .claude/skills/tax-review/scripts/tax.js selftest
 
 금액 단위는 화면과 같은 만원이다 (20억 → `200000`).
 
+## 배포
+
+공개 사이트(https://sexyback83.github.io/tax-review/)는 `gh-pages` 브랜치의 `index.html` 한 개를 서빙한다.
+그 파일은 `build-standalone.js` 가 원본을 자기완결 형태로 묶은 것이다 — `calc.js`·`fp.js` 인라인, 이미지 data URI 화.
+
+```bash
+node build-standalone.js
+```
+
+**앱의 빌드도구가 아니다.** `company_tax/tax-review/index.html` 은 이 스크립트 없이도 브라우저로 열면 그대로 동작한다.
+이 스크립트는 배포본을 만들 뿐이며, 문서 껍데기(`doctype`·`head`·`body`)를 건드리지 않는다 —
+`<meta name="viewport">` 가 빠지면 모바일이 데스크톱 폭으로 렌더된다. 빌드 검사가 이를 막는다.
+
+원본을 고쳐도 사이트는 자동으로 바뀌지 않는다. 재빌드 후 `gh-pages` 에 올려야 반영된다.
+
+
 ## 고지
 
 **이 도구의 결과는 개산이다.** 실제 신고·납부는 세무 전문가의 확인을 거쳐야 한다.
 동거주택 상속공제(상증법 제23조의2)는 의도적으로 구현하지 않았으므로, 요건에 해당하는 경우 세액이 실제보다 크게 나온다.
+
 
 ## 라이선스
 
