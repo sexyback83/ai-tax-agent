@@ -3,7 +3,7 @@
 상담 자리에서 고객의 예상 세금을 개산하는 단일 페이지 웹 도구.
 상속·증여·양도·법인 8개 세목을 5단계 위저드로 순회하고, 결과에 계산 과정과 적용 기준을 함께 낸다.
 
-**바로 사용 → https://sexyback83.github.io/ai-tax-agent/**
+**바로 사용 → https://sexyback83.github.io/tax-review/**
 
 설치도 서버도 필요 없다. 내려받아 `company_tax/tax-review/index.html` 을 브라우저로 열어도 똑같이 동작한다.
 
